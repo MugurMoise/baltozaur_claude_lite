@@ -1,5 +1,3 @@
-import type { Lang } from '../i18n';
-
 interface Props {
   label: string;
   value: number;
