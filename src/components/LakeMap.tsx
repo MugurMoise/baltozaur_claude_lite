@@ -35,7 +35,7 @@ export function LakeMap({ lakes }: Props) {
 
       lakes.forEach((lake) => {
         const color = getScoreColor(lake.score);
-        const label = getScoreLabel(lake.score);
+        const label = getScoreLabel(lake.score, 'ro');
 
         const icon = L.divIcon({
           className: '',

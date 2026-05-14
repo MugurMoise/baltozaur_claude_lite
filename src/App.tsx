@@ -28,7 +28,6 @@ export default function App() {
 
   const today   = new Date().toISOString().slice(0, 10);
   const isToday = selectedDay === today;
-  const topScore = lakes.length ? Math.max(...lakes.map((l) => l.score)) : 0;
 
   const filtered = lakes.filter((l) => {
     if (filter === 'excellent') return l.score >= 55;
@@ -56,7 +55,6 @@ export default function App() {
           refreshing={refreshing}
           onRefresh={refresh}
           lakeCount={lakes.length}
-          topScore={topScore}
           isToday={isToday}
           lang={lang}
           onLangToggle={() => setLang(l => l === 'ro' ? 'en' : 'ro')}

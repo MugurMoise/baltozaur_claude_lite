@@ -6,13 +6,12 @@ interface Props {
   refreshing: boolean;
   onRefresh: () => void;
   lakeCount: number;
-  topScore: number;
   isToday: boolean;
   lang: Lang;
   onLangToggle: () => void;
 }
 
-export function DashboardHeader({ lastUpdated, refreshing, onRefresh, lakeCount, topScore, isToday, lang, onLangToggle }: Props) {
+export function DashboardHeader({ lastUpdated, refreshing, onRefresh, lakeCount, isToday, lang, onLangToggle }: Props) {
   const tr = t[lang];
   const locale = lang === 'ro' ? 'ro-RO' : 'en-GB';
   const timeStr = lastUpdated
