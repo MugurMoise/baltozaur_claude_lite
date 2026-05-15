@@ -1,5 +1,6 @@
 import type { Lang } from '../i18n';
 import { t } from '../i18n';
+import { NotificationBell } from './notifications/NotificationBell';
 
 interface Props {
   lastUpdated: Date | null;
@@ -38,6 +39,7 @@ export function DashboardHeader({ lastUpdated, refreshing, onRefresh, lakeCount,
           </div>
 
           <div className="flex items-center gap-2">
+            <NotificationBell />
             <button
               onClick={onLangToggle}
               className="h-10 px-3 rounded-2xl bg-white/5 border border-white/10 flex items-center gap-1.5 text-slate-300 hover:text-white hover:bg-white/10 transition-all"

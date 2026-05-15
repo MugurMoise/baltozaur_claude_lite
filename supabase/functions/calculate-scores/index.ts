@@ -7,7 +7,6 @@ serve(async () => {
     Deno.env.get("SERVICE_ROLE_KEY")!
   );
 
-  // ── Scoring (unchanged from your original) ─────────────────────────────────
   function calculateCarpScore(weather: {
     pressure: number;
     pressureDelta: number;
@@ -17,28 +16,38 @@ serve(async () => {
     cloud_cover: number;
     precipitation: number;
   }) {
-    let score = 50;
+    let score = 35;
 
-    if (weather.pressure < 1010) score += 10;
+    if (weather.pressure >= 1008 && weather.pressure <= 1015) score += 8;
+    if (weather.pressure < 1005)  score += 12;
+    if (weather.pressure > 1020)  score -= 15;
 
-    if (weather.wind_speed >= 8 && weather.wind_speed <= 20) score += 10;
+    if (weather.pressureDelta <= -1) score += 10;
+    if (weather.pressureDelta <= -3) score += 15;
+    if (weather.pressureDelta <= -6) score += 8;
+    if (weather.pressureDelta >= 2)  score -= 12;
+    if (weather.pressureDelta >= 5)  score -= 20;
 
-    if (weather.temperature >= 16 && weather.temperature <= 24) score += 20;
+    if (weather.temperature >= 17 && weather.temperature <= 23) score += 15;
+    if (weather.temperature < 10)  score -= 20;
+    if (weather.temperature > 30)  score -= 15;
 
-    if (weather.pressureDelta <= -2) score += 15;
-    if (weather.pressureDelta <= -5) score += 10;
-    if (weather.pressureDelta >= 3)  score -= 15;
-    if (weather.pressureDelta >= 6)  score -= 25;
+    if (weather.temperatureDelta > 1)  score += 6;
+    if (weather.temperatureDelta > 3)  score += 8;
+    if (weather.temperatureDelta < -2) score -= 10;
 
-    if (weather.temperatureDelta > 2)  score += 10;
-    if (weather.temperatureDelta < -3) score -= 10;
+    if (weather.wind_speed >= 7 && weather.wind_speed <= 18) score += 10;
+    if (weather.wind_speed > 30) score -= 20;
 
-    if (weather.cloud_cover >= 60) score += 10;
+    if (weather.cloud_cover >= 40 && weather.cloud_cover <= 85) score += 10;
+    if (weather.cloud_cover < 15) score -= 8;
 
-    if (weather.precipitation > 0 && weather.precipitation <= 2) score += 5;
-    if (weather.precipitation > 5) score -= 15;
+    if (weather.precipitation > 0 && weather.precipitation <= 1.5) score += 6;
+    if (weather.precipitation > 4) score -= 15;
 
-    return Math.max(0, Math.min(score, 100));
+    score += Math.floor(Math.random() * 8) - 4;
+
+    return Math.max(0, Math.min(Math.round(score), 100));
   }
 
   function getBestFeedingWindows(sunrise: string, sunset: string): string[] {
@@ -50,7 +59,6 @@ serve(async () => {
     ];
   }
 
-  // ── Fetch lakes ────────────────────────────────────────────────────────────
   const { data: lakes, error: lakesError } = await supabase
     .from("lakes")
     .select("*");
@@ -66,10 +74,6 @@ serve(async () => {
 
   for (const lake of lakes) {
     try {
-      // ── Open-Meteo: current + 7-day daily forecast ─────────────────────────
-      // daily:   one value per calendar day (pressure_msl_mean is not available,
-      //          so we use hourly and pick noon values — see below)
-      // We request hourly for pressure + temp, and daily for wind/precip/cloud/sun
       const url =
         `https://api.open-meteo.com/v1/forecast` +
         `?latitude=${lake.lat}` +
@@ -85,9 +89,8 @@ serve(async () => {
 
       const current = json.current;
       const daily   = json.daily;
-      const hourly  = json.hourly; // arrays of 168 values (7 days × 24h)
+      const hourly  = json.hourly;
 
-      // ── Fetch last known pressure & temperature for delta calculation ───────
       const { data: previous } = await supabase
         .from("lake_scores")
         .select("pressure, temperature, calculated_at")
@@ -99,9 +102,6 @@ serve(async () => {
       const basePressure    = previous?.pressure    ?? current.pressure_msl;
       const baseTemperature = previous?.temperature ?? current.temperature_2m;
 
-      // ── Delete stale forecast rows for this lake (keep today's history) ────
-      // We only delete rows whose calculated_at date is >= tomorrow,
-      // so historical snapshots are preserved.
       const tomorrow = new Date();
       tomorrow.setDate(tomorrow.getDate() + 1);
       tomorrow.setHours(0, 0, 0, 0);
@@ -112,24 +112,20 @@ serve(async () => {
         .eq("lake_id", lake.id)
         .gte("calculated_at", tomorrow.toISOString());
 
-      // ── Insert one row per forecast day ────────────────────────────────────
-      const numDays = daily.time.length; // typically 7
+      const numDays = daily.time.length;
       let insertedDays = 0;
 
       for (let d = 0; d < numDays; d++) {
-        const dateStr = daily.time[d]; // e.g. "2026-05-14"
+        const dateStr = daily.time[d];
 
-        // Pick the noon hourly index for this day (d*24 + 12)
-        const noonIdx   = d * 24 + 12;
-        const pressure  = hourly.pressure_msl[noonIdx]    ?? current.pressure_msl;
-        const temp      = hourly.temperature_2m[noonIdx]  ?? current.temperature_2m;
+        const noonIdx  = d * 24 + 12;
+        const pressure = hourly.pressure_msl[noonIdx]   ?? current.pressure_msl;
+        const temp     = hourly.temperature_2m[noonIdx] ?? current.temperature_2m;
 
-        // For day 0 use actual current values; for future days use daily aggregates
-        const windSpeed   = d === 0 ? current.windspeed_10m  : daily.windspeed_10m_max[d];
-        const cloudCover  = d === 0 ? current.cloud_cover    : daily.cloudcover_mean[d];
-        const precip      = d === 0 ? current.precipitation  : daily.precipitation_sum[d];
+        const windSpeed  = d === 0 ? current.windspeed_10m : daily.windspeed_10m_max[d];
+        const cloudCover = d === 0 ? current.cloud_cover   : daily.cloudcover_mean[d];
+        const precip     = d === 0 ? current.precipitation : daily.precipitation_sum[d];
 
-        // Delta: day 0 vs previous DB reading; day N vs day N-1 noon value
         let pressureDelta: number;
         let tempDelta: number;
 
@@ -152,13 +148,8 @@ serve(async () => {
           precipitation:    precip,
         });
 
-        const feedingWindows = getBestFeedingWindows(
-          daily.sunrise[d],
-          daily.sunset[d]
-        );
-
-        // Set calculated_at to noon on the forecast date so date filtering works cleanly
-        const calculatedAt = `${dateStr}T12:00:00.000Z`;
+        const feedingWindows = getBestFeedingWindows(daily.sunrise[d], daily.sunset[d]);
+        const calculatedAt   = `${dateStr}T12:00:00.000Z`;
 
         await supabase.from("lake_scores").insert({
           lake_id:           lake.id,

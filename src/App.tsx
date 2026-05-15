@@ -9,11 +9,27 @@ import { LakeMap } from './components/LakeMap';
 import { StatsBar } from './components/StatsBar';
 import { BestFeedingSection } from './components/BestFeedingSection';
 import { HowItWorks } from './components/HowItWorks';
+import { AddLakePage } from './pages/AddLakePage';
+
+// Simple path-based routing — no extra dependencies
+function useRoute() {
+  const [path, setPath] = useState(window.location.pathname);
+  const navigate = (to: string) => {
+    window.history.pushState({}, '', to);
+    setPath(to);
+  };
+  return { path, navigate };
+}
 
 type Tab    = 'list' | 'map';
 type Filter = 'all' | 'excellent' | 'improving';
 
 export default function App() {
+  const { path, navigate } = useRoute();
+
+  // Route: /add-lake
+  if (path === '/add-lake') return <AddLakePage />;
+
   const [lang, setLang] = useState<Lang>('ro');
   const tr = t[lang];
   const locale = lang === 'ro' ? 'ro-RO' : 'en-GB';
@@ -163,8 +179,15 @@ export default function App() {
                 </>
               )}
 
-              <footer className="text-center py-8 text-xs text-slate-700 font-body">
-                Baltozaur · baltozaur.ro
+              <footer className="text-center py-8 space-y-4">
+                <button
+                  onClick={() => navigate('/add-lake')}
+                  className="inline-flex items-center gap-2 bg-white/[0.04] border border-white/10 hover:bg-white/[0.08] text-slate-300 hover:text-white rounded-2xl px-5 py-3 font-body text-sm font-medium transition-all"
+                >
+                  <span className="text-lg">➕</span>
+                  Adaugă un lac nou
+                </button>
+                <p className="text-xs text-slate-700 font-body">Baltozaur · baltozaur.ro</p>
               </footer>
             </>
           )}
