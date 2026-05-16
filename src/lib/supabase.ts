@@ -143,26 +143,11 @@ export async function fetchLakeScoresForDay(day: string): Promise<LakeScore[]> {
 
 // ── Legacy: fetch latest scores (used as today fallback) ────────────────────
 export async function fetchLakeScores(): Promise<LakeScore[]> {
+  const today = getLocalDateKey();
+
   if (!supabase) {
-    const today = getLocalDateKey();
     return SAMPLE_LAKES.filter((l) => l.calculated_at.startsWith(today));
   }
 
-  const { data, error } = await supabase
-    .from('latest_lake_scores')
-    .select('*')
-    .order('score', { ascending: false });
-
-  if (error || !data || data.length === 0) {
-    console.error('[Baltozaur] fetchLakeScores error:', error?.message);
-    const today = getLocalDateKey();
-    return SAMPLE_LAKES.filter((l) => l.calculated_at.startsWith(today));
-  }
-
-  return (data as LakeScore[]).map((row) => ({
-    ...row,
-    pressure_delta: row.pressure_delta ?? 0,
-    temperature_delta: row.temperature_delta ?? 0,
-    feeding_windows: normaliseFeedingWindows(row.feeding_windows),
-  }));
+  return fetchLakeScoresForDay(today);
 }

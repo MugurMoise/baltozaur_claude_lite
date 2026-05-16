@@ -132,15 +132,14 @@ serve(async (req) => {
       const basePressure    = previous?.pressure    ?? current.pressure_msl;
       const baseTemperature = previous?.temperature ?? current.temperature_2m;
 
-      const tomorrow = new Date();
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      tomorrow.setHours(0, 0, 0, 0);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
 
       await supabase
         .from(tables.lakeScores)
         .delete()
         .eq("lake_id", lake.id)
-        .gte("calculated_at", tomorrow.toISOString());
+        .gte("calculated_at", today.toISOString());
 
       const numDays = daily.time.length;
       let insertedDays = 0;
