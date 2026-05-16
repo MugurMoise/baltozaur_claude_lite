@@ -1,11 +1,26 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-serve(async () => {
+serve(async (req) => {
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SERVICE_ROLE_KEY")!
   );
+  const url = new URL(req.url);
+  const mode = url.searchParams.get("env") ?? "prod";
+  const limitParam = Number(url.searchParams.get("limit") ?? "0");
+  const offsetParam = Number(url.searchParams.get("offset") ?? "0");
+  const limit = Number.isFinite(limitParam) && limitParam > 0
+    ? Math.min(Math.floor(limitParam), 10)
+    : null;
+  const offset = Number.isFinite(offsetParam) && offsetParam > 0
+    ? Math.floor(offsetParam)
+    : 0;
+  const tablePrefix = mode === "dev" ? "dev_" : "";
+  const tables = {
+    lakes: `${tablePrefix}lakes`,
+    lakeScores: `${tablePrefix}lake_scores`,
+  };
 
   function calculateCarpScore(weather: {
     pressure: number;
@@ -59,9 +74,17 @@ serve(async () => {
     ];
   }
 
-  const { data: lakes, error: lakesError } = await supabase
-    .from("lakes")
-    .select("*");
+  // ── Fetch lakes ────────────────────────────────────────────────────────────
+  let lakesQuery = supabase
+    .from(tables.lakes)
+    .select("*")
+    .order("name", { ascending: true });
+
+  if (limit) {
+    lakesQuery = lakesQuery.range(offset, offset + limit - 1);
+  }
+
+  const { data: lakes, error: lakesError } = await lakesQuery;
 
   if (lakesError || !lakes?.length) {
     return new Response(JSON.stringify({ success: false, error: "No lakes found" }), {
@@ -91,8 +114,13 @@ serve(async () => {
       const daily   = json.daily;
       const hourly  = json.hourly;
 
+      if (!res.ok || !current || !daily?.time?.length || !hourly?.time?.length) {
+        throw new Error(`Open-Meteo failed: ${json.reason ?? res.statusText}`);
+      }
+
+      // ── Fetch last known pressure & temperature for delta calculation ───────
       const { data: previous } = await supabase
-        .from("lake_scores")
+        .from(tables.lakeScores)
         .select("pressure, temperature, calculated_at")
         .eq("lake_id", lake.id)
         .order("calculated_at", { ascending: false })
@@ -107,7 +135,7 @@ serve(async () => {
       tomorrow.setHours(0, 0, 0, 0);
 
       await supabase
-        .from("lake_scores")
+        .from(tables.lakeScores)
         .delete()
         .eq("lake_id", lake.id)
         .gte("calculated_at", tomorrow.toISOString());
@@ -151,7 +179,7 @@ serve(async () => {
         const feedingWindows = getBestFeedingWindows(daily.sunrise[d], daily.sunset[d]);
         const calculatedAt   = `${dateStr}T12:00:00.000Z`;
 
-        await supabase.from("lake_scores").insert({
+        await supabase.from(tables.lakeScores).insert({
           lake_id:           lake.id,
           score,
           pressure,
@@ -174,7 +202,7 @@ serve(async () => {
   }
 
   return new Response(
-    JSON.stringify({ success: true, results }),
+    JSON.stringify({ success: true, mode, limit, offset, processed: results.length, results }),
     { headers: { "Content-Type": "application/json" } }
   );
 });
