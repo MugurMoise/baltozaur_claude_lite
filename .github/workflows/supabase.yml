@@ -1,5 +1,7 @@
 name: Supabase
 
+# Deploy database changes through the Supabase CLI.
+
 on:
   push:
     branches:
