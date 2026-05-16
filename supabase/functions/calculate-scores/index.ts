@@ -6,6 +6,11 @@ serve(async () => {
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SERVICE_ROLE_KEY")!
   );
+  const tablePrefix = Deno.env.get("BALTOZAUR_ENV") === "dev" ? "dev_" : "";
+  const tables = {
+    lakes: `${tablePrefix}lakes`,
+    lakeScores: `${tablePrefix}lake_scores`,
+  };
 
   // ── Scoring (unchanged from your original) ─────────────────────────────────
   function calculateCarpScore(weather: {
@@ -52,7 +57,7 @@ serve(async () => {
 
   // ── Fetch lakes ────────────────────────────────────────────────────────────
   const { data: lakes, error: lakesError } = await supabase
-    .from("lakes")
+    .from(tables.lakes)
     .select("*");
 
   if (lakesError || !lakes?.length) {
@@ -89,7 +94,7 @@ serve(async () => {
 
       // ── Fetch last known pressure & temperature for delta calculation ───────
       const { data: previous } = await supabase
-        .from("lake_scores")
+        .from(tables.lakeScores)
         .select("pressure, temperature, calculated_at")
         .eq("lake_id", lake.id)
         .order("calculated_at", { ascending: false })
@@ -107,7 +112,7 @@ serve(async () => {
       tomorrow.setHours(0, 0, 0, 0);
 
       await supabase
-        .from("lake_scores")
+        .from(tables.lakeScores)
         .delete()
         .eq("lake_id", lake.id)
         .gte("calculated_at", tomorrow.toISOString());
@@ -160,7 +165,7 @@ serve(async () => {
         // Set calculated_at to noon on the forecast date so date filtering works cleanly
         const calculatedAt = `${dateStr}T12:00:00.000Z`;
 
-        await supabase.from("lake_scores").insert({
+        await supabase.from(tables.lakeScores).insert({
           lake_id:           lake.id,
           score,
           pressure,

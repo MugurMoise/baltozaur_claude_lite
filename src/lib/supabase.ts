@@ -3,6 +3,16 @@ import type { LakeScore } from '../types/lake';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+const appEnv = (import.meta.env.VITE_APP_ENV as string | undefined) ?? 'prod';
+const tablePrefix = appEnv === 'dev' ? 'dev_' : '';
+
+export const isDevEnvironment = appEnv === 'dev';
+export const tables = {
+  lakes: `${tablePrefix}lakes`,
+  lakeScores: `${tablePrefix}lake_scores`,
+  latestLakeScores: `${tablePrefix}latest_lake_scores`,
+  pushSubscriptions: `${tablePrefix}push_subscriptions`,
+} as const;
 
 export const supabase =
   supabaseUrl && supabaseAnonKey
@@ -50,7 +60,7 @@ export async function fetchAvailableDays(): Promise<string[]> {
 
   // Get distinct calendar days from calculated_at
   const { data, error } = await supabase
-    .from('lake_scores')
+    .from(tables.lakeScores)
     .select('calculated_at')
     .order('calculated_at', { ascending: true });
 
@@ -80,7 +90,7 @@ export async function fetchLakeScoresForDay(day: string): Promise<LakeScore[]> {
   const endOf   = `${day}T23:59:59`;
 
   const { data, error } = await supabase
-    .from('lake_scores')
+    .from(tables.lakeScores)
     .select(`
       id,
       lake_id,
@@ -92,7 +102,7 @@ export async function fetchLakeScoresForDay(day: string): Promise<LakeScore[]> {
       pressure_delta,
       temperature_delta,
       feeding_windows,
-      lakes (
+      ${tables.lakes} (
         name,
         county,
         distance_km,
@@ -125,11 +135,11 @@ export async function fetchLakeScoresForDay(day: string): Promise<LakeScore[]> {
     pressure_delta: row.pressure_delta ?? 0,
     temperature_delta: row.temperature_delta ?? 0,
     feeding_windows: normaliseFeedingWindows(row.feeding_windows),
-    name: row.lakes?.name ?? 'Unknown',
-    county: row.lakes?.county ?? '—',
-    distance_km: row.lakes?.distance_km ?? 0,
-    lat: row.lakes?.lat ?? 0,
-    lon: row.lakes?.lon ?? 0,
+    name: row[tables.lakes]?.name ?? 'Unknown',
+    county: row[tables.lakes]?.county ?? '—',
+    distance_km: row[tables.lakes]?.distance_km ?? 0,
+    lat: row[tables.lakes]?.lat ?? 0,
+    lon: row[tables.lakes]?.lon ?? 0,
   } as LakeScore));
 }
 
@@ -141,7 +151,7 @@ export async function fetchLakeScores(): Promise<LakeScore[]> {
   }
 
   const { data, error } = await supabase
-    .from('latest_lake_scores')
+    .from(tables.latestLakeScores)
     .select('*')
     .order('score', { ascending: false });
 

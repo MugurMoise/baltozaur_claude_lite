@@ -1,18 +1,35 @@
 # Dev and Production Workflow
 
-Baltozaur uses two Git branches and two Supabase branches:
+Baltozaur uses two Git branches and one Supabase project.
 
-| Environment | Git branch | Vercel target | Supabase branch |
+Because Supabase Branching and extra projects are not available, development data lives in separate `dev_*` tables inside the same Supabase project.
+
+| Environment | Git branch | Vercel target | Supabase tables |
 | --- | --- | --- | --- |
-| Development | `dev` | Preview / `dev.baltozaur.ro` | `dev` |
-| Production | `main` | Production / `baltozaur.ro` | production |
+| Development | `dev` | Preview / `dev.baltozaur.ro` | `dev_lakes`, `dev_lake_scores`, `dev_latest_lake_scores` |
+| Production | `main` | Production / `baltozaur.ro` | `lakes`, `lake_scores`, `latest_lake_scores` |
+
+## Environment Switch
+
+The frontend chooses tables with `VITE_APP_ENV`:
+
+```env
+VITE_APP_ENV=dev
+```
+
+When `VITE_APP_ENV=dev`, the app reads from `dev_*` tables. Any other value, or an unset value, uses production table names.
 
 ## Local Development
 
-Use the Supabase `dev` branch locally.
-
 1. Copy `.env.example` to `.env`.
-2. Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` from the Supabase `dev` branch API settings.
+2. Set:
+
+```env
+VITE_APP_ENV=dev
+VITE_SUPABASE_URL=your_supabase_project_url
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+```
+
 3. Run:
 
 ```bash
@@ -24,35 +41,49 @@ Local `.env` files are ignored by Git.
 
 ## Vercel Environment Variables
 
-In Vercel Project Settings, configure the same variable names for different targets:
+Use the same Supabase URL/key in both environments, but change `VITE_APP_ENV`:
 
 | Variable | Preview / Development | Production |
 | --- | --- | --- |
-| `VITE_SUPABASE_URL` | Supabase `dev` branch URL | Supabase production URL |
-| `VITE_SUPABASE_ANON_KEY` | Supabase `dev` branch anon key | Supabase production anon key |
-| `VITE_VAPID_PUBLIC_KEY` | dev VAPID public key | prod VAPID public key |
+| `VITE_APP_ENV` | `dev` | `prod` |
+| `VITE_SUPABASE_URL` | Supabase project URL | Supabase project URL |
+| `VITE_SUPABASE_ANON_KEY` | Supabase anon key | Supabase anon key |
+| `VITE_VAPID_PUBLIC_KEY` | dev/test key if used | prod key if used |
 
 Use `main` as the production branch in Vercel. Pushes to `dev` should create preview deployments.
 
-## Supabase Branching
+## Supabase Migration
 
-In Supabase:
+Apply the migration in `supabase/migrations/20260516000100_dev_environment_tables.sql`.
 
-1. Enable Branching for the production project.
-2. Create or connect a branch named `dev`.
-3. Connect the Supabase `dev` branch to the GitHub `dev` branch if using the Supabase GitHub integration.
-4. Keep database schema changes in `supabase/migrations`.
-5. Test migrations and Edge Functions on `dev` before merging to `main`.
+It creates:
 
-Preview branches do not automatically copy production data. Add safe seed/test data to the dev branch for testing.
+- `dev_lakes`
+- `dev_lake_scores`
+- `dev_latest_lake_scores`
+- `dev_push_subscriptions`
+
+It also inserts a tiny seed dataset so dev has data before the weather job runs.
+
+## Edge Function Dev Mode
+
+The `calculate-scores` Edge Function chooses tables with the `BALTOZAUR_ENV` secret:
+
+```env
+BALTOZAUR_ENV=dev
+```
+
+For production, leave `BALTOZAUR_ENV` unset or set it to `prod`.
+
+If using the same function for both environments, be careful when changing this secret. A safer pattern is to deploy a separate dev function name later, such as `calculate-scores-dev`, with `BALTOZAUR_ENV=dev`.
 
 ## Release Flow
 
 1. Work on `dev`.
-2. Test against the Supabase `dev` branch and Vercel preview.
-3. Merge `dev` into `main`.
-4. Vercel deploys `main` to `baltozaur.ro`.
-5. Supabase production receives approved migrations/functions through the configured workflow.
+2. Test the Vercel preview with `VITE_APP_ENV=dev`.
+3. Test Edge Function changes against `dev_*` tables using `BALTOZAUR_ENV=dev`.
+4. Merge `dev` into `main`.
+5. Vercel deploys `main` to `baltozaur.ro` with `VITE_APP_ENV=prod`.
 
 ## Secrets
 
