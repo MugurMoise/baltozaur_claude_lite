@@ -1,5 +1,5 @@
 import type { Lang } from '../i18n';
-import { t } from '../i18n';
+import { getLocale, t } from '../i18n';
 
 export interface LakeScore {
   id: string;
@@ -70,7 +70,7 @@ export function getConditionTags(lake: LakeScore, lang: Lang): string[] {
 }
 
 export function formatDay(dateStr: string, lang: Lang): { label: string; sub: string; iso: string } {
-  const locale = lang === 'ro' ? 'ro-RO' : 'en-GB';
+  const locale = getLocale(lang);
   const [y, m, d] = dateStr.split('-').map(Number);
   const date = new Date(y, m - 1, d);
   const today = new Date(); today.setHours(0,0,0,0);

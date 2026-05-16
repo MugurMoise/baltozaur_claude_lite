@@ -1,5 +1,5 @@
 import type { Lang } from '../i18n';
-import { t } from '../i18n';
+import { getLocale, langMeta, t } from '../i18n';
 
 interface Props {
   lastUpdated: Date | null;
@@ -13,7 +13,7 @@ interface Props {
 
 export function DashboardHeader({ lastUpdated, refreshing, onRefresh, lakeCount, isToday, lang, onLangToggle }: Props) {
   const tr = t[lang];
-  const locale = lang === 'ro' ? 'ro-RO' : 'en-GB';
+  const locale = getLocale(lang);
   const timeStr = lastUpdated
     ? lastUpdated.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })
     : '—';
@@ -42,7 +42,7 @@ export function DashboardHeader({ lastUpdated, refreshing, onRefresh, lakeCount,
               onClick={onLangToggle}
               className="h-10 px-3 rounded-2xl bg-white/5 border border-white/10 flex items-center gap-1.5 text-slate-300 hover:text-white hover:bg-white/10 transition-all"
             >
-              <span className="text-base">{lang === 'ro' ? '🇷🇴' : '🇬🇧'}</span>
+              <span className="text-base">{langMeta[lang].flag}</span>
               <span className="text-xs font-body font-semibold">{lang.toUpperCase()}</span>
             </button>
             <button

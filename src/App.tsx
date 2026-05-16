@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useLakes } from './hooks/useLakes';
 import type { Lang } from './i18n';
-import { t } from './i18n';
+import { getLocale, getNextLang, t } from './i18n';
 import { DashboardHeader } from './components/DashboardHeader';
 import { DaySelector } from './components/DaySelector';
 import { LakeCard } from './components/LakeCard';
@@ -16,7 +16,7 @@ type Filter = 'all' | 'excellent' | 'improving';
 export default function App() {
   const [lang, setLang] = useState<Lang>('ro');
   const tr = t[lang];
-  const locale = lang === 'ro' ? 'ro-RO' : 'en-GB';
+  const locale = getLocale(lang);
 
   const {
     lakes, loading, error, lastUpdated, refreshing,
@@ -57,7 +57,7 @@ export default function App() {
           lakeCount={lakes.length}
           isToday={isToday}
           lang={lang}
-          onLangToggle={() => setLang(l => l === 'ro' ? 'en' : 'ro')}
+          onLangToggle={() => setLang(getNextLang)}
         />
 
         <main className="max-w-2xl mx-auto px-4 py-5 space-y-5">
