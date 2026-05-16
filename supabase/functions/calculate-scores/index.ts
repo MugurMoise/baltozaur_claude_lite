@@ -22,6 +22,16 @@ serve(async (req) => {
     lakeScores: `${tablePrefix}lake_scores`,
   };
 
+  function errorMessage(err: unknown) {
+    if (err instanceof Error) return err.message;
+
+    try {
+      return JSON.stringify(err);
+    } catch {
+      return String(err);
+    }
+  }
+
   async function syncDevFromProd() {
     const { data: prodLakes, error: prodLakesError } = await supabase
       .from("lakes")
@@ -100,10 +110,12 @@ serve(async (req) => {
       throw prodScoresError;
     }
 
-    if (prodScores?.length) {
+    const devScoresToInsert = (prodScores ?? []).filter((score) => prodLakeIds.has(score.lake_id));
+
+    if (devScoresToInsert.length) {
       const { error: insertScoresError } = await supabase
         .from("dev_lake_scores")
-        .insert(prodScores);
+        .insert(devScoresToInsert);
 
       if (insertScoresError) {
         throw insertScoresError;
@@ -112,7 +124,7 @@ serve(async (req) => {
 
     return {
       lakes: prodLakes?.length ?? 0,
-      scores: prodScores?.length ?? 0,
+      scores: devScoresToInsert.length,
     };
   }
 
@@ -125,7 +137,7 @@ serve(async (req) => {
       );
     } catch (err) {
       return new Response(
-        JSON.stringify({ success: false, mode, mirroredFromProd: true, error: String(err) }),
+        JSON.stringify({ success: false, mode, mirroredFromProd: true, error: errorMessage(err) }),
         { status: 500, headers: { "Content-Type": "application/json" } }
       );
     }
@@ -307,7 +319,7 @@ serve(async (req) => {
       results.push({ lake: lake.name, days: insertedDays });
 
     } catch (err) {
-      results.push({ lake: lake.name, days: 0, error: String(err) });
+      results.push({ lake: lake.name, days: 0, error: errorMessage(err) });
     }
   }
 
@@ -316,7 +328,7 @@ serve(async (req) => {
   try {
     syncedDev = await syncDevFromProd();
   } catch (err) {
-    syncDevError = String(err);
+    syncDevError = errorMessage(err);
   }
 
   return new Response(
