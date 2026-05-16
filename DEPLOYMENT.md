@@ -65,6 +65,26 @@ It creates:
 
 It also inserts a tiny seed dataset so dev has data before the weather job runs.
 
+## Supabase Pipeline
+
+GitHub Actions deploys Supabase changes from `.github/workflows/supabase.yml`.
+
+Add these repository secrets in GitHub:
+
+| Secret | Value |
+| --- | --- |
+| `SUPABASE_ACCESS_TOKEN` | Supabase personal access token |
+| `SUPABASE_DB_PASSWORD` | Database password for the existing Supabase project |
+| `SUPABASE_PROJECT_REF` | Project ref, for example the `ecg...` part of `https://ecg....supabase.co` |
+
+Pipeline behavior:
+
+- Pushes to `dev` apply database migrations only after checking that changed migrations target `dev_*` tables/views and do not write production tables.
+- Pushes to `main` apply database migrations and deploy Edge Functions.
+- Manual runs are available from the GitHub Actions tab.
+
+Because dev and prod share one Supabase project, the `dev` guard is intentionally conservative. Production table migrations should go through `main`.
+
 ## Edge Function Dev Mode
 
 The `calculate-scores` Edge Function chooses tables with a query parameter:
