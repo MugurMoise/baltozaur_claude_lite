@@ -8,6 +8,14 @@ serve(async (req) => {
   );
   const url = new URL(req.url);
   const mode = url.searchParams.get("env") ?? "prod";
+  const limitParam = Number(url.searchParams.get("limit") ?? "0");
+  const offsetParam = Number(url.searchParams.get("offset") ?? "0");
+  const limit = Number.isFinite(limitParam) && limitParam > 0
+    ? Math.min(Math.floor(limitParam), 10)
+    : null;
+  const offset = Number.isFinite(offsetParam) && offsetParam > 0
+    ? Math.floor(offsetParam)
+    : 0;
   const tablePrefix = mode === "dev" ? "dev_" : "";
   const tables = {
     lakes: `${tablePrefix}lakes`,
@@ -58,9 +66,16 @@ serve(async (req) => {
   }
 
   // ── Fetch lakes ────────────────────────────────────────────────────────────
-  const { data: lakes, error: lakesError } = await supabase
+  let lakesQuery = supabase
     .from(tables.lakes)
-    .select("*");
+    .select("*")
+    .order("name", { ascending: true });
+
+  if (limit) {
+    lakesQuery = lakesQuery.range(offset, offset + limit - 1);
+  }
+
+  const { data: lakes, error: lakesError } = await lakesQuery;
 
   if (lakesError || !lakes?.length) {
     return new Response(JSON.stringify({ success: false, error: "No lakes found" }), {
@@ -93,6 +108,10 @@ serve(async (req) => {
       const current = json.current;
       const daily   = json.daily;
       const hourly  = json.hourly; // arrays of 168 values (7 days × 24h)
+
+      if (!res.ok || !current || !daily?.time?.length || !hourly?.time?.length) {
+        throw new Error(`Open-Meteo failed: ${json.reason ?? res.statusText}`);
+      }
 
       // ── Fetch last known pressure & temperature for delta calculation ───────
       const { data: previous } = await supabase
@@ -190,7 +209,7 @@ serve(async (req) => {
   }
 
   return new Response(
-    JSON.stringify({ success: true, results }),
+    JSON.stringify({ success: true, mode, limit, offset, processed: results.length, results }),
     { headers: { "Content-Type": "application/json" } }
   );
 });

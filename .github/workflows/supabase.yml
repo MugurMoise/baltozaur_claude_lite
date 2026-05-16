@@ -69,5 +69,5 @@ jobs:
         run: supabase db push
 
       - name: Deploy Edge Functions
-        if: github.ref_name == 'main'
+        if: github.ref_name == 'main' || github.ref_name == 'dev'
         run: supabase functions deploy --project-ref "$SUPABASE_PROJECT_REF"
