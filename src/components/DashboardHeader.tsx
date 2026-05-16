@@ -1,5 +1,5 @@
 import type { Lang } from '../i18n';
-import { getLocale, langMeta, t } from '../i18n';
+import { getLocale, LANGUAGES, langMeta, t } from '../i18n';
 import { NotificationBell } from './notifications/NotificationBell';
 
 interface Props {
@@ -9,10 +9,10 @@ interface Props {
   lakeCount: number;
   isToday: boolean;
   lang: Lang;
-  onLangToggle: () => void;
+  onLangChange: (lang: Lang) => void;
 }
 
-export function DashboardHeader({ lastUpdated, refreshing, onRefresh, lakeCount, isToday, lang, onLangToggle }: Props) {
+export function DashboardHeader({ lastUpdated, refreshing, onRefresh, lakeCount, isToday, lang, onLangChange }: Props) {
   const tr = t[lang];
   const locale = getLocale(lang);
   const timeStr = lastUpdated
@@ -40,13 +40,18 @@ export function DashboardHeader({ lastUpdated, refreshing, onRefresh, lakeCount,
 
           <div className="flex items-center gap-2">
             <NotificationBell />
-            <button
-              onClick={onLangToggle}
-              className="h-10 px-3 rounded-2xl bg-white/5 border border-white/10 flex items-center gap-1.5 text-slate-300 hover:text-white hover:bg-white/10 transition-all"
+            <select
+              value={lang}
+              onChange={(event) => onLangChange(event.target.value as Lang)}
+              aria-label="Language"
+              className="h-10 rounded-2xl bg-white/5 border border-white/10 pl-3 pr-8 text-xs font-body font-semibold text-slate-300 hover:text-white hover:bg-white/10 transition-all outline-none"
             >
-              <span className="text-base">{langMeta[lang].flag}</span>
-              <span className="text-xs font-body font-semibold">{lang.toUpperCase()}</span>
-            </button>
+              {LANGUAGES.map((code) => (
+                <option key={code} value={code}>
+                  {langMeta[code].flag} {code.toUpperCase()}
+                </option>
+              ))}
+            </select>
             <button
               onClick={onRefresh}
               disabled={refreshing}
