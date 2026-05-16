@@ -1,6 +1,7 @@
 import { formatDay } from '../types/lake';
 import type { Lang } from '../i18n';
 import { t } from '../i18n';
+import { getLocalDateKey } from '../lib/date';
 
 interface Props {
   days: string[];
@@ -11,7 +12,7 @@ interface Props {
 
 export function DaySelector({ days, selected, onSelect, lang }: Props) {
   if (days.length === 0) return null;
-  const today = new Date().toISOString().slice(0, 10);
+  const today = getLocalDateKey();
 
   return (
     <div className="flex flex-col gap-3">

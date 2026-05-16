@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import type { LakeScore } from '../types/lake';
+import { getLocalDateKey } from './date';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
@@ -26,7 +27,7 @@ function normaliseFeedingWindows(raw: unknown): string[] | null {
 const SAMPLE_DAYS = [0, 1, 2, 3, 4].map((offset) => {
   const d = new Date();
   d.setDate(d.getDate() + offset);
-  return d.toISOString().slice(0, 10);
+  return getLocalDateKey(d);
 });
 
 export const SAMPLE_LAKES: LakeScore[] = SAMPLE_DAYS.flatMap((day, di) => [
@@ -66,7 +67,14 @@ export async function fetchAvailableDays(): Promise<string[]> {
     seen.add(day);
   }
 
-  return seen.size > 0 ? Array.from(seen).sort() : SAMPLE_DAYS;
+  const today = getLocalDateKey();
+  seen.add(today);
+
+  const days = Array.from(seen)
+    .filter((day) => day >= today)
+    .sort();
+
+  return days.length > 0 ? days : SAMPLE_DAYS;
 }
 
 // ── Fetch lake scores for a specific day, joined with lake metadata ──────────
@@ -136,7 +144,7 @@ export async function fetchLakeScoresForDay(day: string): Promise<LakeScore[]> {
 // ── Legacy: fetch latest scores (used as today fallback) ────────────────────
 export async function fetchLakeScores(): Promise<LakeScore[]> {
   if (!supabase) {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = getLocalDateKey();
     return SAMPLE_LAKES.filter((l) => l.calculated_at.startsWith(today));
   }
 
@@ -147,7 +155,7 @@ export async function fetchLakeScores(): Promise<LakeScore[]> {
 
   if (error || !data || data.length === 0) {
     console.error('[Baltozaur] fetchLakeScores error:', error?.message);
-    const today = new Date().toISOString().slice(0, 10);
+    const today = getLocalDateKey();
     return SAMPLE_LAKES.filter((l) => l.calculated_at.startsWith(today));
   }
 

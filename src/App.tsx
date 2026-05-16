@@ -10,6 +10,7 @@ import { StatsBar } from './components/StatsBar';
 import { BestFeedingSection } from './components/BestFeedingSection';
 import { HowItWorks } from './components/HowItWorks';
 import { AddLakePage } from './pages/AddLakePage';
+import { getLocalDateKey } from './lib/date';
 
 // Simple path-based routing — no extra dependencies
 function useRoute() {
@@ -42,7 +43,7 @@ export default function App() {
   const [tab, setTab]       = useState<Tab>('list');
   const [filter, setFilter] = useState<Filter>('all');
 
-  const today   = new Date().toISOString().slice(0, 10);
+  const today   = getLocalDateKey();
   const isToday = selectedDay === today;
 
   const filtered = lakes.filter((l) => {

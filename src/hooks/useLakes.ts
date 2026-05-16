@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { fetchAvailableDays, fetchLakeScoresForDay, fetchLakeScores } from '../lib/supabase';
 import type { LakeScore } from '../types/lake';
+import { getLocalDateKey } from '../lib/date';
 
 const REFRESH_INTERVAL = 60_000;
 
@@ -18,11 +19,11 @@ export function useLakes() {
     fetchAvailableDays().then((days) => {
       setAvailableDays(days);
       // Default to today if present, otherwise first available day
-      const today = new Date().toISOString().slice(0, 10);
+      const today = getLocalDateKey();
       const defaultDay = days.includes(today) ? today : (days[0] ?? today);
       setSelectedDay(defaultDay);
     }).catch(() => {
-      const today = new Date().toISOString().slice(0, 10);
+      const today = getLocalDateKey();
       setAvailableDays([today]);
       setSelectedDay(today);
     });
@@ -36,7 +37,7 @@ export function useLakes() {
     setError(null);
 
     try {
-      const today = new Date().toISOString().slice(0, 10);
+      const today = getLocalDateKey();
       // For today, prefer the latest_lake_scores view (has deltas computed)
       const data = day === today
         ? await fetchLakeScores()
@@ -59,7 +60,7 @@ export function useLakes() {
 
   // Auto-refresh only when viewing today
   useEffect(() => {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = getLocalDateKey();
     if (selectedDay !== today) return;
     const interval = setInterval(() => loadScores(today, true), REFRESH_INTERVAL);
     return () => clearInterval(interval);
