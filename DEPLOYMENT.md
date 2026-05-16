@@ -67,21 +67,25 @@ It also inserts a tiny seed dataset so dev has data before the weather job runs.
 
 ## Edge Function Dev Mode
 
-The `calculate-scores` Edge Function chooses tables with the `BALTOZAUR_ENV` secret:
+The `calculate-scores` Edge Function chooses tables with a query parameter:
 
-```env
-BALTOZAUR_ENV=dev
+```text
+/functions/v1/calculate-scores?env=dev
 ```
 
-For production, leave `BALTOZAUR_ENV` unset or set it to `prod`.
+For production, call the function without the query parameter:
 
-If using the same function for both environments, be careful when changing this secret. A safer pattern is to deploy a separate dev function name later, such as `calculate-scores-dev`, with `BALTOZAUR_ENV=dev`.
+```text
+/functions/v1/calculate-scores
+```
+
+This keeps the production cron path unchanged while letting manual/dev runs write to `dev_*` tables.
 
 ## Release Flow
 
 1. Work on `dev`.
 2. Test the Vercel preview with `VITE_APP_ENV=dev`.
-3. Test Edge Function changes against `dev_*` tables using `BALTOZAUR_ENV=dev`.
+3. Test Edge Function changes against `dev_*` tables using `calculate-scores?env=dev`.
 4. Merge `dev` into `main`.
 5. Vercel deploys `main` to `baltozaur.ro` with `VITE_APP_ENV=prod`.
 

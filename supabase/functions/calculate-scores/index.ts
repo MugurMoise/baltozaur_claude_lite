@@ -1,12 +1,14 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-serve(async () => {
+serve(async (req) => {
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SERVICE_ROLE_KEY")!
   );
-  const tablePrefix = Deno.env.get("BALTOZAUR_ENV") === "dev" ? "dev_" : "";
+  const url = new URL(req.url);
+  const mode = url.searchParams.get("env") ?? "prod";
+  const tablePrefix = mode === "dev" ? "dev_" : "";
   const tables = {
     lakes: `${tablePrefix}lakes`,
     lakeScores: `${tablePrefix}lake_scores`,
