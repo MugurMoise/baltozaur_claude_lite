@@ -31,36 +31,38 @@ serve(async (req) => {
     cloud_cover: number;
     precipitation: number;
   }) {
-    let score = 35;
+    let score = 55;
 
-    if (weather.pressure >= 1008 && weather.pressure <= 1015) score += 8;
-    if (weather.pressure < 1005)  score += 12;
-    if (weather.pressure > 1020)  score -= 15;
+    if (weather.temperature >= 18 && weather.temperature <= 26) score += 22;
+    else if (weather.temperature >= 14 && weather.temperature < 18) score += 12;
+    else if (weather.temperature > 26 && weather.temperature <= 30) score += 8;
+    else if (weather.temperature < 10) score -= 18;
+    else if (weather.temperature > 32) score -= 18;
 
-    if (weather.pressureDelta <= -1) score += 10;
-    if (weather.pressureDelta <= -3) score += 15;
-    if (weather.pressureDelta <= -6) score += 8;
-    if (weather.pressureDelta >= 2)  score -= 12;
-    if (weather.pressureDelta >= 5)  score -= 20;
+    if (weather.pressure >= 1000 && weather.pressure <= 1012) score += 16;
+    else if (weather.pressure > 1012 && weather.pressure <= 1018) score += 8;
+    else if (weather.pressure < 995) score += 6;
+    else if (weather.pressure > 1022) score -= 12;
 
-    if (weather.temperature >= 17 && weather.temperature <= 23) score += 15;
-    if (weather.temperature < 10)  score -= 20;
-    if (weather.temperature > 30)  score -= 15;
+    if (weather.pressureDelta <= -0.5 && weather.pressureDelta >= -6) score += 14;
+    else if (weather.pressureDelta < -6) score += 6;
+    else if (weather.pressureDelta > -0.5 && weather.pressureDelta < 1.5) score += 6;
+    else if (weather.pressureDelta >= 1.5 && weather.pressureDelta < 4) score -= 8;
+    else if (weather.pressureDelta >= 4) score -= 18;
 
-    if (weather.temperatureDelta > 1)  score += 6;
-    if (weather.temperatureDelta > 3)  score += 8;
-    if (weather.temperatureDelta < -2) score -= 10;
+    if (weather.wind_speed >= 4 && weather.wind_speed <= 18) score += 12;
+    else if (weather.wind_speed > 18 && weather.wind_speed <= 25) score += 5;
+    else if (weather.wind_speed < 4) score += 2;
+    else if (weather.wind_speed > 30) score -= 18;
 
-    if (weather.wind_speed >= 7 && weather.wind_speed <= 18) score += 10;
-    if (weather.wind_speed > 30) score -= 20;
+    if (weather.cloud_cover >= 30 && weather.cloud_cover <= 90) score += 8;
+    else if (weather.cloud_cover < 15) score -= 5;
 
-    if (weather.cloud_cover >= 40 && weather.cloud_cover <= 85) score += 10;
-    if (weather.cloud_cover < 15) score -= 8;
+    if (weather.temperatureDelta > 0.5 && weather.temperatureDelta <= 4) score += 6;
+    else if (weather.temperatureDelta < -3) score -= 8;
 
-    if (weather.precipitation > 0 && weather.precipitation <= 1.5) score += 6;
-    if (weather.precipitation > 4) score -= 15;
-
-    score += Math.floor(Math.random() * 8) - 4;
+    if (weather.precipitation > 0 && weather.precipitation <= 2) score += 4;
+    else if (weather.precipitation > 5) score -= 14;
 
     return Math.max(0, Math.min(Math.round(score), 100));
   }
