@@ -9,6 +9,7 @@ import { LakeMap } from './components/LakeMap';
 import { StatsBar } from './components/StatsBar';
 import { BestFeedingSection } from './components/BestFeedingSection';
 import { HowItWorks } from './components/HowItWorks';
+import { getLocalDateKey } from './lib/date';
 
 type Tab    = 'list' | 'map';
 type Filter = 'all' | 'excellent' | 'improving';
@@ -26,7 +27,7 @@ export default function App() {
   const [tab, setTab]       = useState<Tab>('list');
   const [filter, setFilter] = useState<Filter>('all');
 
-  const today   = new Date().toISOString().slice(0, 10);
+  const today   = getLocalDateKey();
   const isToday = selectedDay === today;
 
   const filtered = lakes.filter((l) => {

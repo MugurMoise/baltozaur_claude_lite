@@ -1,5 +1,6 @@
 import type { Lang } from '../i18n';
 import { getLocale, t } from '../i18n';
+import { getLocalDateKey } from '../lib/date';
 
 export interface LakeScore {
   id: string;
@@ -75,8 +76,8 @@ export function formatDay(dateStr: string, lang: Lang): { label: string; sub: st
   const date = new Date(y, m - 1, d);
   const today = new Date(); today.setHours(0,0,0,0);
   const tomorrow = new Date(today); tomorrow.setDate(today.getDate() + 1);
-  const todayIso    = today.toISOString().slice(0, 10);
-  const tomorrowIso = tomorrow.toISOString().slice(0, 10);
+  const todayIso    = getLocalDateKey(today);
+  const tomorrowIso = getLocalDateKey(tomorrow);
   const sub = date.toLocaleDateString(locale, { day: 'numeric', month: 'short' });
   if (dateStr === todayIso)    return { label: t[lang].today,    sub, iso: dateStr };
   if (dateStr === tomorrowIso) return { label: t[lang].tomorrow, sub, iso: dateStr };
