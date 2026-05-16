@@ -1,42 +1,85 @@
 -- Keep dev_lakes 1:1 with production lakes for realistic dev testing.
 -- This copies public lake metadata only, not score history or subscriptions.
 
-insert into dev_lakes (
-  id,
-  name,
-  county,
-  distance_km,
-  lat,
-  lon,
-  lake_type,
-  description,
-  website_url,
-  facebook_url,
-  created_at
-)
-select
-  id,
-  'Dev ' || regexp_replace(name, '^Dev\s+', ''),
-  county,
-  distance_km,
-  lat,
-  lon,
-  lake_type,
-  description,
-  website_url,
-  facebook_url,
-  coalesce(created_at, now())
-from lakes
-on conflict (id) do update set
-  name = excluded.name,
-  county = excluded.county,
-  distance_km = excluded.distance_km,
-  lat = excluded.lat,
-  lon = excluded.lon,
-  lake_type = excluded.lake_type,
-  description = excluded.description,
-  website_url = excluded.website_url,
-  facebook_url = excluded.facebook_url;
+do $$
+declare
+  has_lake_type boolean;
+  has_description boolean;
+  has_website_url boolean;
+  has_facebook_url boolean;
+  has_created_at boolean;
+begin
+  select exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'lakes' and column_name = 'lake_type'
+  ) into has_lake_type;
+
+  select exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'lakes' and column_name = 'description'
+  ) into has_description;
+
+  select exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'lakes' and column_name = 'website_url'
+  ) into has_website_url;
+
+  select exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'lakes' and column_name = 'facebook_url'
+  ) into has_facebook_url;
+
+  select exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'lakes' and column_name = 'created_at'
+  ) into has_created_at;
+
+  execute format(
+    $sql$
+    insert into dev_lakes (
+      id,
+      name,
+      county,
+      distance_km,
+      lat,
+      lon,
+      lake_type,
+      description,
+      website_url,
+      facebook_url,
+      created_at
+    )
+    select
+      id,
+      'Dev ' || regexp_replace(name, '^Dev\s+', ''),
+      county,
+      distance_km,
+      lat,
+      lon,
+      %s,
+      %s,
+      %s,
+      %s,
+      %s
+    from lakes
+    on conflict (id) do update set
+      name = excluded.name,
+      county = excluded.county,
+      distance_km = excluded.distance_km,
+      lat = excluded.lat,
+      lon = excluded.lon,
+      lake_type = excluded.lake_type,
+      description = excluded.description,
+      website_url = excluded.website_url,
+      facebook_url = excluded.facebook_url
+    $sql$,
+    case when has_lake_type then 'lake_type' else '''commercial''::text' end,
+    case when has_description then 'description' else 'null::text' end,
+    case when has_website_url then 'website_url' else 'null::text' end,
+    case when has_facebook_url then 'facebook_url' else 'null::text' end,
+    case when has_created_at then 'coalesce(created_at, now())' else 'now()' end
+  );
+end $$;
 
 -- Remove dev lakes that no longer exist in production so the sets stay 1:1.
 delete from dev_lakes d
