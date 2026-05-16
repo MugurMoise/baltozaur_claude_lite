@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useLakes } from './hooks/useLakes';
 import type { Lang } from './i18n';
-import { getLocale, getNextLang, t } from './i18n';
+import { getLocale, t } from './i18n';
 import { DashboardHeader } from './components/DashboardHeader';
 import { DaySelector } from './components/DaySelector';
 import { LakeCard } from './components/LakeCard';
@@ -57,7 +57,7 @@ export default function App() {
           lakeCount={lakes.length}
           isToday={isToday}
           lang={lang}
-          onLangToggle={() => setLang(getNextLang)}
+          onLangChange={setLang}
         />
 
         <main className="max-w-2xl mx-auto px-4 py-5 space-y-5">
