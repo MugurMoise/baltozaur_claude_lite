@@ -9,12 +9,14 @@ npm install
 npm run dev
 ```
 
+For development, use the `dev` Git branch and point `.env` at the Supabase `dev` branch. See [DEPLOYMENT.md](./DEPLOYMENT.md) for the full dev/prod workflow.
+
 ## Environment Variables
 
 Copy `.env.example` to `.env` and fill in your Supabase credentials:
 
 ```env
-VITE_SUPABASE_URL=https://ecgscjtczbtvkqrdogoo.supabase.co
+VITE_SUPABASE_URL=your_supabase_branch_url
 VITE_SUPABASE_ANON_KEY=your_anon_key_here
 ```
 
