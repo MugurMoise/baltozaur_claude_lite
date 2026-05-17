@@ -24,7 +24,11 @@ export function DashboardHeader({ lastUpdated, refreshing, onRefresh, lakeCount,
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="relative">
-              <span className="text-3xl">🦕</span>
+              <img
+                src="/baltozaur-mark.png"
+                alt="Baltozaur"
+                className="h-14 w-16 object-contain drop-shadow-[0_8px_18px_rgba(0,0,0,0.45)]"
+              />
               {isToday && (
                 <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-mud-900">
                   <span className="absolute inset-0 rounded-full bg-emerald-400 animate-ping opacity-75" />

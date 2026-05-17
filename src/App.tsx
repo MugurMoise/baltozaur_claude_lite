@@ -10,12 +10,25 @@ import { StatsBar } from './components/StatsBar';
 import { BestFeedingSection } from './components/BestFeedingSection';
 import { HowItWorks } from './components/HowItWorks';
 import { getLocalDateKey } from './lib/date';
+import { SocialSignalsPage } from './pages/SocialSignalsPage';
+import { AddLakePage } from './pages/AddLakePage';
 
 type Tab    = 'list' | 'map';
 type Filter = 'all' | 'excellent' | 'improving';
 type UserLocation = { lat: number; lon: number };
 
 export default function App() {
+  if (window.location.pathname.startsWith('/social')) {
+    return <SocialSignalsPage />;
+  }
+  if (window.location.pathname.startsWith('/suggest-lake') || window.location.pathname.startsWith('/add-lake')) {
+    return <AddLakePage />;
+  }
+
+  return <DashboardApp />;
+}
+
+function DashboardApp() {
   const [lang, setLang] = useState<Lang>('ro');
   const tr = t[lang];
   const locale = getLocale(lang);
@@ -203,7 +216,10 @@ export default function App() {
               )}
 
               <footer className="text-center py-8 text-xs text-slate-700 font-body">
-                Baltozaur · baltozaur.ro
+                Baltozaur · baltozaur.ro ·{' '}
+                <a href="/suggest-lake" className="text-slate-500 hover:text-slate-300">
+                  Sugereaza o balta
+                </a>
               </footer>
             </>
           )}

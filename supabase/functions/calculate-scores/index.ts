@@ -85,6 +85,8 @@ serve(async (req) => {
         lon: lake.lon ?? 26.1025,
         lake_type: lake.lake_type ?? "commercial",
         description: lake.description ?? null,
+        rules: lake.rules ?? null,
+        price: lake.price ?? null,
         website_url: lake.website_url ?? null,
         facebook_url: lake.facebook_url ?? null,
         phone: lake.phone ?? null,
@@ -96,7 +98,7 @@ serve(async (req) => {
         .upsert(devLakesToUpsert, { onConflict: "id" });
 
       if (lakesUpsertError) {
-        const fallbackLakes = devLakesToUpsert.map(({ phone, ...lake }) => lake);
+        const fallbackLakes = devLakesToUpsert.map(({ phone, rules, price, ...lake }) => lake);
         const { error: fallbackLakesUpsertError } = await supabase
           .from("dev_lakes")
           .upsert(fallbackLakes, { onConflict: "id" });
@@ -230,13 +232,41 @@ serve(async (req) => {
     return Math.max(0, Math.min(Math.round(score), 100));
   }
 
-  function getBestFeedingWindows(sunrise: string, sunset: string): string[] {
-    const sunriseHour = new Date(sunrise).getHours();
-    const sunsetHour  = new Date(sunset).getHours();
-    return [
-      `${sunriseHour - 1}:00-${sunriseHour + 3}:00`,
-      `${sunsetHour - 3}:00-${sunsetHour + 1}:00`,
+  function getFeedingSlots(args: {
+    sunrise: string;
+    sunset: string;
+    hourlyPrecip: number[];
+    hourlyWind: number[];
+  }): string[] {
+    const sunriseHour = new Date(args.sunrise).getHours();
+    const sunsetHour = new Date(args.sunset).getHours();
+    const slots = [
+      { start: 6, end: 10 },
+      { start: 10, end: 14 },
+      { start: 14, end: 18 },
+      { start: 18, end: 30 },
     ];
+
+    return slots.map((slot) => {
+      const hours = Array.from({ length: slot.end - slot.start }, (_, index) => (slot.start + index) % 24);
+      const rainHours = hours.filter((hour) => (args.hourlyPrecip[hour] ?? 0) >= 0.1).length;
+      const maxWind = Math.max(...hours.map((hour) => args.hourlyWind[hour] ?? 0));
+      const overlapsSunrise = slot.start < sunriseHour + 2 && slot.end > sunriseHour - 1;
+      const overlapsSunset = slot.start < sunsetHour + 1 && slot.end > sunsetHour - 3;
+
+      let score = 35;
+      if (overlapsSunrise || overlapsSunset) score += 35;
+      if (slot.start >= 8 && slot.end <= 16) score -= 10;
+      if (rainHours > 2) score -= 45;
+      else if (rainHours > 0) score -= 18;
+      if (maxWind >= 25) score -= 28;
+      else if (maxWind >= 18) score -= 12;
+
+      const label = score >= 70 ? "excelent" : score >= 50 ? "bun" : score >= 30 ? "slab" : "evita";
+      const start = String(slot.start).padStart(2, "0");
+      const end = String(slot.end % 24).padStart(2, "0");
+      return `${start}:00-${end}:00 · ${label}`;
+    });
   }
 
   // ── Fetch lakes ────────────────────────────────────────────────────────────
@@ -351,7 +381,12 @@ serve(async (req) => {
           rainyWindHours,
         });
 
-        const feedingWindows = getBestFeedingWindows(daily.sunrise[d], daily.sunset[d]);
+        const feedingWindows = getFeedingSlots({
+          sunrise: daily.sunrise[d],
+          sunset: daily.sunset[d],
+          hourlyPrecip,
+          hourlyWind,
+        });
         const calculatedAt   = `${dateStr}T12:00:00.000Z`;
 
         const scorePayload = {
