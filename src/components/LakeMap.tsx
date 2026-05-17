@@ -36,6 +36,7 @@ export function LakeMap({ lakes }: Props) {
       lakes.forEach((lake) => {
         const color = getScoreColor(lake.score);
         const label = getScoreLabel(lake.score, 'ro');
+        const locationLabel = lake.county;
 
         const icon = L.divIcon({
           className: '',
@@ -75,7 +76,7 @@ export function LakeMap({ lakes }: Props) {
               ${lake.name}
             </div>
             <div style="font-size: 11px; color: #64748b; margin-bottom: 10px;">
-              ${lake.county} · ${lake.distance_km} km
+              ${locationLabel}
             </div>
             <div style="
               display: inline-flex; align-items: center; gap: 6px;

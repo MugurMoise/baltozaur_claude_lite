@@ -13,6 +13,7 @@ import { getLocalDateKey } from './lib/date';
 
 type Tab    = 'list' | 'map';
 type Filter = 'all' | 'excellent' | 'improving';
+type UserLocation = { lat: number; lon: number };
 
 export default function App() {
   const [lang, setLang] = useState<Lang>('ro');
@@ -26,6 +27,8 @@ export default function App() {
 
   const [tab, setTab]       = useState<Tab>('list');
   const [filter, setFilter] = useState<Filter>('all');
+  const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
+  const [locationStatus, setLocationStatus] = useState<'idle' | 'loading' | 'denied'>('idle');
 
   const today   = getLocalDateKey();
   const isToday = selectedDay === today;
@@ -41,6 +44,26 @@ export default function App() {
     const [y, m, d] = selectedDay.split('-').map(Number);
     return new Date(y, m - 1, d).toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' });
   })();
+
+  const requestLocation = () => {
+    if (!navigator.geolocation) {
+      setLocationStatus('denied');
+      return;
+    }
+
+    setLocationStatus('loading');
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setUserLocation({
+          lat: position.coords.latitude,
+          lon: position.coords.longitude,
+        });
+        setLocationStatus('idle');
+      },
+      () => setLocationStatus('denied'),
+      { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 }
+    );
+  };
 
   return (
     <div className="min-h-screen bg-mud-900 text-white font-body">
@@ -82,6 +105,21 @@ export default function App() {
 
           {/* How it works */}
           <HowItWorks lang={lang} />
+
+          {!userLocation && (
+            <div className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3">
+              <span className="text-sm text-slate-300 font-body">
+                {locationStatus === 'denied' ? tr.locationDenied : tr.useMyLocation}
+              </span>
+              <button
+                onClick={requestLocation}
+                disabled={locationStatus === 'loading'}
+                className="shrink-0 rounded-xl border border-lake-500/40 bg-lake-600/25 px-3 py-2 text-sm font-semibold text-white transition-all hover:bg-lake-600/40 disabled:opacity-60"
+              >
+                {locationStatus === 'loading' ? '...' : tr.useMyLocation}
+              </button>
+            </div>
+          )}
 
           {loading ? (
             <div className="space-y-4">
@@ -149,7 +187,7 @@ export default function App() {
                   <div className="space-y-4">
                     {filtered.length > 0 ? (
                       filtered.map((lake, i) => (
-                        <LakeCard key={lake.id} lake={lake} rank={i + 1} lang={lang} />
+                        <LakeCard key={lake.id} lake={lake} rank={i + 1} lang={lang} userLocation={userLocation} />
                       ))
                     ) : (
                       <div className="text-center py-16 text-slate-500 font-body">

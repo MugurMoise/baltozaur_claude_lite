@@ -9,13 +9,18 @@ export interface LakeScore {
   pressure: number;
   wind_speed: number;
   temperature: number;
+  precipitation: number | null;
+  rain_hours: number | null;
   calculated_at: string;
   pressure_delta: number | null;
   temperature_delta: number | null;
   feeding_windows: string[] | null;
   name: string;
   county: string;
-  distance_km: number;
+  distance_km: number | null;
+  website_url: string | null;
+  facebook_url: string | null;
+  phone: string | null;
   lat: number;
   lon: number;
 }
@@ -60,6 +65,9 @@ export function getRecommendation(score: number, lang: Lang): string {
 export function getConditionTags(lake: LakeScore, lang: Lang): string[] {
   const tr = t[lang].conditions;
   const tags: string[] = [];
+  if ((lake.rain_hours ?? 0) > 2 && lake.wind_speed >= 20) tags.push(tr.rainWindBad);
+  else if ((lake.rain_hours ?? 0) > 2) tags.push(tr.rainBad);
+  else if ((lake.precipitation ?? 0) > 0) tags.push(tr.rainLight);
   if (lake.temperature >= 16 && lake.temperature <= 24) tags.push(tr.tempGood);
   else tags.push(tr.tempBad);
   if (lake.wind_speed >= 8 && lake.wind_speed <= 20) tags.push(tr.windGood);

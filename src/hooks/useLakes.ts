@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { fetchAvailableDays, fetchLakeScoresForDay, fetchLakeScores } from '../lib/supabase';
+import { fetchAvailableDays, fetchLakeScoresForDay } from '../lib/supabase';
 import type { LakeScore } from '../types/lake';
 import { getLocalDateKey } from '../lib/date';
 
@@ -37,11 +37,7 @@ export function useLakes() {
     setError(null);
 
     try {
-      const today = getLocalDateKey();
-      // For today, prefer the latest_lake_scores view (has deltas computed)
-      const data = day === today
-        ? await fetchLakeScores()
-        : await fetchLakeScoresForDay(day);
+      const data = await fetchLakeScoresForDay(day);
       setLakes(data);
       setLastUpdated(new Date());
     } catch (e) {

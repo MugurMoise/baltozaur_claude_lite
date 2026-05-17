@@ -77,6 +77,7 @@ serve(async (req) => {
         description: lake.description ?? null,
         website_url: lake.website_url ?? null,
         facebook_url: lake.facebook_url ?? null,
+        phone: lake.phone ?? null,
         created_at: lake.created_at ?? new Date().toISOString(),
       }));
 
@@ -85,7 +86,14 @@ serve(async (req) => {
         .upsert(devLakesToUpsert, { onConflict: "id" });
 
       if (lakesUpsertError) {
-        throw lakesUpsertError;
+        const fallbackLakes = devLakesToUpsert.map(({ phone, ...lake }) => lake);
+        const { error: fallbackLakesUpsertError } = await supabase
+          .from("dev_lakes")
+          .upsert(fallbackLakes, { onConflict: "id" });
+
+        if (fallbackLakesUpsertError) {
+          throw fallbackLakesUpsertError;
+        }
       }
     }
 
@@ -101,10 +109,24 @@ serve(async (req) => {
       throw deleteScoresError;
     }
 
-    const { data: prodScores, error: prodScoresError } = await supabase
+    let { data: prodScores, error: prodScoresError } = await supabase
       .from("lake_scores")
-      .select("lake_id, score, pressure, pressure_delta, wind_speed, temperature, temperature_delta, feeding_windows, calculated_at")
+      .select("lake_id, score, pressure, pressure_delta, wind_speed, temperature, temperature_delta, feeding_windows, calculated_at, precipitation, rain_hours")
       .gte("calculated_at", today.toISOString());
+
+    if (prodScoresError) {
+      const fallback = await supabase
+        .from("lake_scores")
+        .select("lake_id, score, pressure, pressure_delta, wind_speed, temperature, temperature_delta, feeding_windows, calculated_at")
+        .gte("calculated_at", today.toISOString());
+
+      prodScores = fallback.data?.map((score) => ({
+        ...score,
+        precipitation: null,
+        rain_hours: 0,
+      })) ?? null;
+      prodScoresError = fallback.error;
+    }
 
     if (prodScoresError) {
       throw prodScoresError;
@@ -118,7 +140,14 @@ serve(async (req) => {
         .insert(devScoresToInsert);
 
       if (insertScoresError) {
-        throw insertScoresError;
+        const fallbackScores = devScoresToInsert.map(({ precipitation, rain_hours, ...score }) => score);
+        const { error: fallbackInsertScoresError } = await supabase
+          .from("dev_lake_scores")
+          .insert(fallbackScores);
+
+        if (fallbackInsertScoresError) {
+          throw fallbackInsertScoresError;
+        }
       }
     }
 
@@ -151,6 +180,8 @@ serve(async (req) => {
     temperatureDelta: number;
     cloud_cover: number;
     precipitation: number;
+    rainHours: number;
+    rainyWindHours: number;
   }) {
     let score = 55;
 
@@ -182,8 +213,9 @@ serve(async (req) => {
     if (weather.temperatureDelta > 0.5 && weather.temperatureDelta <= 4) score += 6;
     else if (weather.temperatureDelta < -3) score -= 8;
 
-    if (weather.precipitation > 0 && weather.precipitation <= 2) score += 4;
-    else if (weather.precipitation > 5) score -= 14;
+    if (weather.rainyWindHours > 0) score -= 70;
+    else if (weather.rainHours > 2) score -= 50;
+    else if (weather.precipitation > 0) score -= 16;
 
     return Math.max(0, Math.min(Math.round(score), 100));
   }
@@ -227,7 +259,7 @@ serve(async (req) => {
         `&timezone=auto` +
         `&forecast_days=7` +
         `&current=temperature_2m,pressure_msl,windspeed_10m,cloud_cover,precipitation` +
-        `&hourly=temperature_2m,pressure_msl` +
+        `&hourly=temperature_2m,pressure_msl,precipitation,windspeed_10m` +
         `&daily=sunrise,sunset,windspeed_10m_max,precipitation_sum,cloudcover_mean,temperature_2m_max,temperature_2m_min`;
 
       const res  = await fetch(url);
@@ -272,6 +304,15 @@ serve(async (req) => {
         const pressure = hourly.pressure_msl[noonIdx]   ?? current.pressure_msl;
         const temp     = hourly.temperature_2m[noonIdx] ?? current.temperature_2m;
 
+        const dayStartIdx = d * 24;
+        const dayEndIdx = dayStartIdx + 24;
+        const hourlyPrecip = (hourly.precipitation ?? []).slice(dayStartIdx, dayEndIdx);
+        const hourlyWind = (hourly.windspeed_10m ?? []).slice(dayStartIdx, dayEndIdx);
+        const rainHours = hourlyPrecip.filter((value: number) => value >= 0.1).length;
+        const rainyWindHours = hourlyPrecip.filter((value: number, index: number) => (
+          value >= 0.1 && (hourlyWind[index] ?? 0) >= 20
+        )).length;
+
         const windSpeed  = d === 0 ? current.windspeed_10m : daily.windspeed_10m_max[d];
         const cloudCover = d === 0 ? current.cloud_cover   : daily.cloudcover_mean[d];
         const precip     = d === 0 ? current.precipitation : daily.precipitation_sum[d];
@@ -296,12 +337,14 @@ serve(async (req) => {
           temperatureDelta: tempDelta,
           cloud_cover:      cloudCover,
           precipitation:    precip,
+          rainHours,
+          rainyWindHours,
         });
 
         const feedingWindows = getBestFeedingWindows(daily.sunrise[d], daily.sunset[d]);
         const calculatedAt   = `${dateStr}T12:00:00.000Z`;
 
-        await supabase.from(tables.lakeScores).insert({
+        const scorePayload = {
           lake_id:           lake.id,
           score,
           pressure,
@@ -309,9 +352,26 @@ serve(async (req) => {
           wind_speed:        windSpeed,
           temperature:       temp,
           temperature_delta: tempDelta,
+          precipitation:     precip,
+          rain_hours:        rainHours,
           feeding_windows:   feedingWindows,
           calculated_at:     calculatedAt,
-        });
+        };
+
+        const { error: insertError } = await supabase
+          .from(tables.lakeScores)
+          .insert(scorePayload);
+
+        if (insertError) {
+          const { precipitation, rain_hours, ...fallbackScorePayload } = scorePayload;
+          const { error: fallbackInsertError } = await supabase
+            .from(tables.lakeScores)
+            .insert(fallbackScorePayload);
+
+          if (fallbackInsertError) {
+            throw fallbackInsertError;
+          }
+        }
 
         insertedDays++;
       }

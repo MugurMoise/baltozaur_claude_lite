@@ -8,9 +8,22 @@ interface Props {
   lake: LakeScore;
   rank?: number;
   lang: Lang;
+  userLocation?: { lat: number; lon: number } | null;
 }
 
-export function LakeCard({ lake, rank, lang }: Props) {
+function distanceBetweenKm(from: { lat: number; lon: number }, to: { lat: number; lon: number }) {
+  const earthRadiusKm = 6371;
+  const toRad = (value: number) => value * Math.PI / 180;
+  const dLat = toRad(to.lat - from.lat);
+  const dLon = toRad(to.lon - from.lon);
+  const lat1 = toRad(from.lat);
+  const lat2 = toRad(to.lat);
+  const a = Math.sin(dLat / 2) ** 2
+    + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
+  return earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+export function LakeCard({ lake, rank, lang, userLocation }: Props) {
   const [expanded, setExpanded] = useState(false);
   const tr = t[lang];
   const level = getScoreLevel(lake.score);
@@ -18,6 +31,15 @@ export function LakeCard({ lake, rank, lang }: Props) {
   const gradient = getScoreGradient(lake.score);
   const recommendation = getRecommendation(lake.score, lang);
   const conditionTags = getConditionTags(lake, lang);
+  const userDistance = userLocation
+    ? Math.round(distanceBetweenKm(userLocation, { lat: lake.lat, lon: lake.lon }))
+    : null;
+  const locationLabel = userDistance == null
+    ? lake.county
+    : `${lake.county} · ${userDistance} ${tr.distanceFromYou}`;
+  const hasContact = Boolean(lake.website_url || lake.facebook_url || lake.phone);
+  const phoneHref = lake.phone ? `tel:${lake.phone.replace(/[^\d+]/g, '')}` : null;
+  const hasRainWarning = (lake.rain_hours ?? 0) > 2 || ((lake.precipitation ?? 0) > 0 && lake.wind_speed >= 20);
 
   const isGood = level === 'excellent' || level === 'veryGood' || level === 'good';
 
@@ -53,7 +75,7 @@ export function LakeCard({ lake, rank, lang }: Props) {
               {lake.name}
             </h2>
             <p className="text-sm text-slate-400 font-body mt-0.5">
-              {lake.county} · {lake.distance_km} {tr.away}
+              {locationLabel}
             </p>
           </div>
         </div>
@@ -87,6 +109,17 @@ export function LakeCard({ lake, rank, lang }: Props) {
             </span>
           ))}
         </div>
+
+        {hasRainWarning && (
+          <div className="bg-red-500/15 border border-red-500/30 rounded-2xl px-4 py-3 mb-4">
+            <p className="text-xs text-red-300 uppercase tracking-wider font-body mb-1">
+              {tr.rainWarning}
+            </p>
+            <p className="text-sm text-red-100 font-body">
+              {tr.rainWarningText}
+            </p>
+          </div>
+        )}
 
         {/* Feeding windows — prominent */}
         {lake.feeding_windows && lake.feeding_windows.length > 0 && (
@@ -127,6 +160,39 @@ export function LakeCard({ lake, rank, lang }: Props) {
             </svg>
           </button>
         </div>
+
+        {hasContact && (
+          <div className="mt-4 flex flex-wrap gap-2">
+            {lake.website_url && (
+              <a
+                href={lake.website_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm font-body text-slate-200 hover:text-white"
+              >
+                {tr.website}
+              </a>
+            )}
+            {lake.facebook_url && (
+              <a
+                href={lake.facebook_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm font-body text-slate-200 hover:text-white"
+              >
+                Facebook
+              </a>
+            )}
+            {lake.phone && phoneHref && (
+              <a
+                href={phoneHref}
+                className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm font-body text-slate-200 hover:text-white"
+              >
+                {tr.phone}: {lake.phone}
+              </a>
+            )}
+          </div>
+        )}
 
         {/* Technical details — collapsed by default */}
         {expanded && (
