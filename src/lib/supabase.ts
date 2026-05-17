@@ -148,12 +148,18 @@ async function enrichWithLiveRain(lakes: LakeScore[], day: string): Promise<Lake
 async function enrichWithProdLakeDetails(lakes: LakeScore[]): Promise<LakeScore[]> {
   if (!supabase || !isDevEnvironment || lakes.length === 0) return lakes;
 
-  const missingDetails = lakes.filter((lake) => !lake.rules && !lake.price);
+  const missingDetails = lakes.filter((lake) => (
+    !lake.rules ||
+    !lake.price ||
+    !lake.website_url ||
+    !lake.facebook_url ||
+    !lake.phone
+  ));
   if (missingDetails.length === 0) return lakes;
 
   const { data, error } = await supabase
     .from('lakes')
-    .select('id, rules, price')
+    .select('id, rules, price, website_url, facebook_url, phone')
     .in('id', missingDetails.map((lake) => lake.lake_id));
 
   if (error || !data) {
@@ -162,7 +168,14 @@ async function enrichWithProdLakeDetails(lakes: LakeScore[]): Promise<LakeScore[
   }
 
   const detailsByLake = new Map(
-    (data as { id: string; rules: string | null; price: string | null }[])
+    (data as {
+      id: string;
+      rules: string | null;
+      price: string | null;
+      website_url: string | null;
+      facebook_url: string | null;
+      phone: string | null;
+    }[])
       .map((lake) => [lake.id, lake])
   );
 
@@ -173,6 +186,9 @@ async function enrichWithProdLakeDetails(lakes: LakeScore[]): Promise<LakeScore[
       ...lake,
       rules: lake.rules ?? details.rules ?? null,
       price: lake.price ?? details.price ?? null,
+      website_url: lake.website_url ?? details.website_url ?? null,
+      facebook_url: lake.facebook_url ?? details.facebook_url ?? null,
+      phone: lake.phone ?? details.phone ?? null,
     };
   });
 }
