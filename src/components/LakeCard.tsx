@@ -23,6 +23,24 @@ function distanceBetweenKm(from: { lat: number; lon: number }, to: { lat: number
   return earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+function parseFeedingWindow(window: string) {
+  const [timeRange, rawLabel] = window.split('·').map((part) => part.trim());
+  const label = rawLabel || '';
+  const labelLower = label.toLowerCase();
+  const isStrong = labelLower.includes('excelent') || labelLower.includes('bun');
+  const isAvoid = labelLower.includes('evita');
+
+  return {
+    timeRange,
+    label,
+    className: isStrong
+      ? 'border-cyan-400/30 bg-cyan-500/12 text-cyan-100'
+      : isAvoid
+        ? 'border-red-400/25 bg-red-500/10 text-red-200'
+        : 'border-white/10 bg-white/[0.04] text-slate-300',
+  };
+}
+
 export function LakeCard({ lake, rank, lang, userLocation }: Props) {
   const [expanded, setExpanded] = useState(false);
   const tr = t[lang];
@@ -98,18 +116,6 @@ export function LakeCard({ lake, rank, lang, userLocation }: Props) {
           </span>
         </div>
 
-        {/* Condition tags — plain language */}
-        <div className="flex flex-wrap gap-2 mb-4">
-          {conditionTags.map((tag, i) => (
-            <span
-              key={i}
-              className="text-sm bg-white/5 border border-white/10 text-slate-300 rounded-xl px-3 py-1.5 font-body"
-            >
-              {tag}
-            </span>
-          ))}
-        </div>
-
         {hasRainWarning && (
           <div className="bg-red-500/15 border border-red-500/30 rounded-2xl px-4 py-3 mb-4">
             <p className="text-xs text-red-300 uppercase tracking-wider font-body mb-1">
@@ -118,22 +124,6 @@ export function LakeCard({ lake, rank, lang, userLocation }: Props) {
             <p className="text-sm text-red-100 font-body">
               {tr.rainWarningText}
             </p>
-          </div>
-        )}
-
-        {/* Feeding windows — prominent */}
-        {lake.feeding_windows && lake.feeding_windows.length > 0 && (
-          <div className="bg-cyan-500/10 border border-cyan-500/25 rounded-2xl px-4 py-3 mb-4">
-            <p className="text-xs text-cyan-400 uppercase tracking-wider font-body mb-2">
-              {tr.feedingWindows}
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {lake.feeding_windows.map((w, i) => (
-                <span key={i} className="text-base font-mono text-cyan-200 font-semibold">
-                  {w}
-                </span>
-              ))}
-            </div>
           </div>
         )}
 
@@ -164,6 +154,52 @@ export function LakeCard({ lake, rank, lang, userLocation }: Props) {
         {/* Technical details — collapsed by default */}
         {expanded && (
           <div className="mt-4 pt-4 border-t border-white/10 animate-fade-in">
+            {conditionTags.length > 0 && (
+              <div className="mb-4">
+                <p className="text-[10px] text-slate-500 uppercase tracking-wider font-body mb-2">
+                  Detalii conditii
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {conditionTags.map((tag, i) => (
+                    <span
+                      key={i}
+                      className="text-sm bg-white/5 border border-white/10 text-slate-300 rounded-xl px-3 py-1.5 font-body"
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {lake.feeding_windows && lake.feeding_windows.length > 0 && (
+              <div className="mb-4">
+                <p className="text-[10px] text-cyan-400 uppercase tracking-wider font-body mb-2">
+                  {tr.feedingWindows}
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  {lake.feeding_windows.map((w, i) => {
+                    const slot = parseFeedingWindow(w);
+                    return (
+                      <div
+                        key={i}
+                        className={`rounded-xl border px-3 py-2.5 ${slot.className}`}
+                      >
+                        <span className="block font-mono text-sm font-semibold leading-none">
+                          {slot.timeRange}
+                        </span>
+                        {slot.label && (
+                          <span className="mt-1 block text-[10px] uppercase tracking-widest opacity-75">
+                            {slot.label}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <div className="flex flex-col gap-1">
                 <span className="text-[10px] uppercase tracking-widest text-slate-500 font-body">{tr.temp}</span>
@@ -195,6 +231,12 @@ export function LakeCard({ lake, rank, lang, userLocation }: Props) {
             </div>
 
             <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
+              {lake.price && (
+                <div className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2">
+                  <span className="block text-[10px] uppercase tracking-widest text-slate-500 font-body">{tr.price}</span>
+                  <span className="text-sm font-body text-slate-200">{lake.price}</span>
+                </div>
+              )}
               <div className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2">
                 <span className="block text-[10px] uppercase tracking-widest text-slate-500 font-body">{tr.website}</span>
                 {websiteHref ? (
@@ -225,6 +267,17 @@ export function LakeCard({ lake, rank, lang, userLocation }: Props) {
                 )}
               </div>
             </div>
+
+            {lake.rules && (
+              <div className="mt-3 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-3">
+                <span className="block text-[10px] uppercase tracking-widest text-slate-500 font-body">
+                  {tr.rules}
+                </span>
+                <p className="mt-1 whitespace-pre-line text-sm leading-relaxed text-slate-200 font-body">
+                  {lake.rules}
+                </p>
+              </div>
+            )}
           </div>
         )}
       </div>

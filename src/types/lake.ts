@@ -21,6 +21,9 @@ export interface LakeScore {
   website_url: string | null;
   facebook_url: string | null;
   phone: string | null;
+  description: string | null;
+  rules: string | null;
+  price: string | null;
   lat: number;
   lon: number;
 }

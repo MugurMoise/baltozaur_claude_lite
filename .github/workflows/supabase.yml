@@ -53,11 +53,6 @@ jobs:
             echo 'files<<EOF'
             cat /tmp/changed-migrations.txt
             echo 'EOF'
-            if [ -s /tmp/changed-migrations.txt ]; then
-              echo 'has_changes=true'
-            else
-              echo 'has_changes=false'
-            fi
           } >> "$GITHUB_OUTPUT"
 
       - name: Guard dev migrations
@@ -71,7 +66,6 @@ jobs:
         run: supabase link --project-ref "$SUPABASE_PROJECT_REF" --password "$SUPABASE_DB_PASSWORD"
 
       - name: Push database migrations
-        if: steps.migrations.outputs.has_changes == 'true'
         run: supabase db push
 
       - name: Deploy Edge Functions

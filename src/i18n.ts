@@ -19,7 +19,7 @@ export function getNextLang(lang: Lang): Lang {
 
 export const t = {
   ro: {
-    appSubtitle: 'Condiții pescuit crap · București',
+    appSubtitle: 'Condiții pescuit crap',
     live: 'Live',
     forecast: 'Prognoză',
     bestScore: 'Cel mai bun',
@@ -50,6 +50,8 @@ export const t = {
     wind: 'Vânt',
     website: 'Site',
     phone: 'Telefon',
+    rules: 'Regulament',
+    price: 'Preț',
     unavailable: 'indisponibil',
     rain: 'Ploaie',
     useMyLocation: 'Folosește locația mea',
@@ -95,7 +97,7 @@ export const t = {
     },
   },
   en: {
-    appSubtitle: 'Carp fishing conditions · Bucharest',
+    appSubtitle: 'Carp fishing conditions',
     live: 'Live',
     forecast: 'Forecast',
     bestScore: 'Best',
@@ -126,6 +128,8 @@ export const t = {
     wind: 'Wind',
     website: 'Website',
     phone: 'Phone',
+    rules: 'Rules',
+    price: 'Price',
     unavailable: 'unavailable',
     rain: 'Rain',
     useMyLocation: 'Use my location',
@@ -171,7 +175,7 @@ export const t = {
     },
   },
   de: {
-    appSubtitle: 'Karpfenangel-Bedingungen · Bukarest',
+    appSubtitle: 'Karpfenangel-Bedingungen',
     live: 'Live',
     forecast: 'Prognose',
     bestScore: 'Bester Wert',
@@ -202,6 +206,8 @@ export const t = {
     wind: 'Wind',
     website: 'Website',
     phone: 'Telefon',
+    rules: 'Regeln',
+    price: 'Preis',
     unavailable: 'nicht verfügbar',
     rain: 'Regen',
     useMyLocation: 'Meinen Standort nutzen',
@@ -247,7 +253,7 @@ export const t = {
     },
   },
   fr: {
-    appSubtitle: 'Conditions pêche de la carpe · Bucarest',
+    appSubtitle: 'Conditions pêche de la carpe',
     live: 'En direct',
     forecast: 'Prévision',
     bestScore: 'Meilleur',
@@ -278,6 +284,8 @@ export const t = {
     wind: 'Vent',
     website: 'Site',
     phone: 'Téléphone',
+    rules: 'Règlement',
+    price: 'Prix',
     unavailable: 'indisponible',
     rain: 'Pluie',
     useMyLocation: 'Utiliser ma position',
