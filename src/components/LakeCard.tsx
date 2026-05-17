@@ -37,8 +37,8 @@ export function LakeCard({ lake, rank, lang, userLocation }: Props) {
   const locationLabel = userDistance == null
     ? lake.county
     : `${lake.county} · ${userDistance} ${tr.distanceFromYou}`;
-  const hasContact = Boolean(lake.website_url || lake.facebook_url || lake.phone);
-  const phoneHref = lake.phone ? `tel:${lake.phone.replace(/[^\d+]/g, '')}` : null;
+  const websiteHref = lake.website_url ?? lake.facebook_url;
+  const phoneNumbers = lake.phone?.split(/[,/]/).map((phone) => phone.trim()).filter(Boolean) ?? [];
   const hasRainWarning = (lake.rain_hours ?? 0) > 2 || ((lake.precipitation ?? 0) > 0 && lake.wind_speed >= 20);
 
   const isGood = level === 'excellent' || level === 'veryGood' || level === 'good';
@@ -161,42 +161,41 @@ export function LakeCard({ lake, rank, lang, userLocation }: Props) {
           </button>
         </div>
 
-        {hasContact && (
-          <div className="mt-4 flex flex-wrap gap-2">
-            {lake.website_url && (
+        <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <div className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2">
+            <span className="block text-[10px] uppercase tracking-widest text-slate-500 font-body">{tr.website}</span>
+            {websiteHref ? (
               <a
-                href={lake.website_url}
+                href={websiteHref}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm font-body text-slate-200 hover:text-white"
+                className="text-sm font-body text-slate-200 hover:text-white"
               >
-                {tr.website}
+                {lake.website_url ? tr.website : 'Facebook'}
               </a>
-            )}
-            {lake.facebook_url && (
-              <a
-                href={lake.facebook_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm font-body text-slate-200 hover:text-white"
-              >
-                Facebook
-              </a>
-            )}
-            {lake.phone && phoneHref && (
-              <a
-                href={phoneHref}
-                className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm font-body text-slate-200 hover:text-white"
-              >
-                {tr.phone}: {lake.phone}
-              </a>
+            ) : (
+              <span className="text-sm font-body text-slate-500">{tr.unavailable}</span>
             )}
           </div>
-        )}
+          <div className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2">
+            <span className="block text-[10px] uppercase tracking-widest text-slate-500 font-body">{tr.phone}</span>
+            {phoneNumbers.length > 0 ? (
+              <div className="flex flex-wrap gap-x-2 gap-y-1">
+                {phoneNumbers.map((phone) => (
+                  <a key={phone} href={`tel:${phone.replace(/[^\d+]/g, '')}`} className="text-sm font-body text-slate-200 hover:text-white">
+                    {phone}
+                  </a>
+                ))}
+              </div>
+            ) : (
+              <span className="text-sm font-body text-slate-500">{tr.unavailable}</span>
+            )}
+          </div>
+        </div>
 
         {/* Technical details — collapsed by default */}
         {expanded && (
-          <div className="mt-4 pt-4 border-t border-white/10 grid grid-cols-3 gap-3 animate-fade-in">
+          <div className="mt-4 pt-4 border-t border-white/10 grid grid-cols-2 sm:grid-cols-4 gap-3 animate-fade-in">
             <div className="flex flex-col gap-1">
               <span className="text-[10px] uppercase tracking-widest text-slate-500 font-body">{tr.temp}</span>
               <span className="text-white font-mono text-sm">{lake.temperature}°C</span>
@@ -218,6 +217,11 @@ export function LakeCard({ lake, rank, lang, userLocation }: Props) {
             <div className="flex flex-col gap-1">
               <span className="text-[10px] uppercase tracking-widest text-slate-500 font-body">{tr.wind}</span>
               <span className="text-white font-mono text-sm">{lake.wind_speed} km/h</span>
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-[10px] uppercase tracking-widest text-slate-500 font-body">{tr.rain}</span>
+              <span className="text-white font-mono text-sm">{lake.precipitation ?? 0} mm</span>
+              <span className="text-xs font-mono text-slate-400">{lake.rain_hours ?? 0}h</span>
             </div>
           </div>
         )}
