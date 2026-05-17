@@ -325,7 +325,7 @@ serve(async (req) => {
 
         const windSpeed  = d === 0 ? current.windspeed_10m : daily.windspeed_10m_max[d];
         const cloudCover = d === 0 ? current.cloud_cover   : daily.cloudcover_mean[d];
-        const precip     = d === 0 ? current.precipitation : daily.precipitation_sum[d];
+        const precip     = daily.precipitation_sum[d] ?? current.precipitation ?? 0;
 
         let pressureDelta: number;
         let tempDelta: number;

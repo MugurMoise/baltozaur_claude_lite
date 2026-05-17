@@ -33,6 +33,77 @@ function normaliseFeedingWindows(raw: unknown): string[] | null {
   return null;
 }
 
+function getRainPenalty(rainHours: number, rainyWindHours: number, precipitation: number): number {
+  if (rainyWindHours > 0) return 70;
+  if (rainHours > 2) return 50;
+  if (precipitation > 0) return 16;
+  return 0;
+}
+
+async function fetchLiveRainForLake(lake: LakeScore, day: string) {
+  if (!lake.lat || !lake.lon) return null;
+
+  const url = new URL('https://api.open-meteo.com/v1/forecast');
+  url.searchParams.set('latitude', String(lake.lat));
+  url.searchParams.set('longitude', String(lake.lon));
+  url.searchParams.set('timezone', 'Europe/Bucharest');
+  url.searchParams.set('forecast_days', '7');
+  url.searchParams.set('hourly', 'precipitation,rain,showers,wind_speed_10m');
+  url.searchParams.set('daily', 'precipitation_sum,rain_sum,showers_sum');
+
+  try {
+    const response = await fetch(url);
+    if (!response.ok) return null;
+    const data = await response.json();
+
+    const dayIndex = (data.daily?.time ?? []).indexOf(day);
+    if (dayIndex < 0) return null;
+
+    const hourlyTimes: string[] = data.hourly?.time ?? [];
+    const hourlyPrecip: number[] = data.hourly?.precipitation ?? [];
+    const hourlyWind: number[] = data.hourly?.wind_speed_10m ?? [];
+    const dayHourIndexes = hourlyTimes
+      .map((time, index) => ({ time, index }))
+      .filter(({ time }) => time.startsWith(day))
+      .map(({ index }) => index);
+
+    const rainHours = dayHourIndexes.filter((index) => (hourlyPrecip[index] ?? 0) >= 0.1).length;
+    const rainyWindHours = dayHourIndexes.filter((index) => (
+      (hourlyPrecip[index] ?? 0) >= 0.1 && (hourlyWind[index] ?? 0) >= 20
+    )).length;
+    const precipitation = data.daily?.precipitation_sum?.[dayIndex]
+      ?? dayHourIndexes.reduce((sum, index) => sum + (hourlyPrecip[index] ?? 0), 0);
+
+    return { precipitation, rainHours, rainyWindHours };
+  } catch (error) {
+    console.warn('[Baltozaur] live rain fetch failed:', lake.name, error);
+    return null;
+  }
+}
+
+async function enrichWithLiveRain(lakes: LakeScore[], day: string): Promise<LakeScore[]> {
+  const enriched = await Promise.all(lakes.map(async (lake) => {
+    const liveRain = await fetchLiveRainForLake(lake, day);
+    if (!liveRain) return lake;
+
+    const previousPrecipitation = lake.precipitation ?? 0;
+    const previousRainHours = lake.rain_hours ?? 0;
+    const shouldApplyPenalty = previousPrecipitation === 0 && previousRainHours === 0;
+    const penalty = shouldApplyPenalty
+      ? getRainPenalty(liveRain.rainHours, liveRain.rainyWindHours, liveRain.precipitation)
+      : 0;
+
+    return {
+      ...lake,
+      score: Math.max(0, lake.score - penalty),
+      precipitation: Number(liveRain.precipitation.toFixed(1)),
+      rain_hours: liveRain.rainHours,
+    };
+  }));
+
+  return enriched.sort((a, b) => b.score - a.score);
+}
+
 // ── Sample fallback data using real lake names ───────────────────────────────
 const SAMPLE_DAYS = [0, 1, 2, 3, 4].map((offset) => {
   const d = new Date();
@@ -186,7 +257,7 @@ export async function fetchLakeScoresForDay(day: string): Promise<LakeScore[]> {
     if (!latestByLake.has(row.lake_id)) latestByLake.set(row.lake_id, row);
   }
 
-  return Array.from(latestByLake.values()).map((row) => ({
+  const lakes = Array.from(latestByLake.values()).map((row) => ({
     id: row.id,
     lake_id: row.lake_id,
     score: row.score,
@@ -208,6 +279,8 @@ export async function fetchLakeScoresForDay(day: string): Promise<LakeScore[]> {
     lat: row[tables.lakes]?.lat ?? 0,
     lon: row[tables.lakes]?.lon ?? 0,
   } as LakeScore)).sort((a, b) => b.score - a.score);
+
+  return enrichWithLiveRain(lakes, day);
 }
 
 // ── Legacy: fetch latest scores (used as today fallback) ────────────────────
