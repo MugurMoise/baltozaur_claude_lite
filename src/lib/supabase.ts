@@ -105,7 +105,10 @@ export async function fetchLakeScoresForDay(day: string): Promise<LakeScore[]> {
   const startOf = `${day}T00:00:00`;
   const endOf   = `${day}T23:59:59`;
 
-  let { data, error } = await supabase
+  let data: any[] | null = null;
+  let error: { message: string } | null = null;
+
+  const primary = await supabase
     .from(tables.lakeScores)
     .select(`
       id,
@@ -135,6 +138,9 @@ export async function fetchLakeScoresForDay(day: string): Promise<LakeScore[]> {
     .lte('calculated_at', endOf)
     .order('calculated_at', { ascending: false });
 
+  data = primary.data as any[] | null;
+  error = primary.error;
+
   if (error) {
     const fallback = await supabase
       .from(tables.lakeScores)
@@ -161,7 +167,7 @@ export async function fetchLakeScoresForDay(day: string): Promise<LakeScore[]> {
       .lte('calculated_at', endOf)
       .order('calculated_at', { ascending: false });
 
-    data = fallback.data;
+    data = fallback.data as any[] | null;
     error = fallback.error;
   }
 
