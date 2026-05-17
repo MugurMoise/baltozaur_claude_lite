@@ -80,7 +80,7 @@ serve(async (req) => {
         id: lake.id,
         name: lake.name,
         county: lake.county ?? "Necunoscut",
-        distance_km: lake.distance_km ?? 0,
+        distance_km: lake.distance_km ?? null,
         lat: lake.lat ?? 44.4268,
         lon: lake.lon ?? 26.1025,
         lake_type: lake.lake_type ?? "commercial",
