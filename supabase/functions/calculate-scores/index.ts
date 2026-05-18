@@ -52,28 +52,6 @@ serve(async (req) => {
     }
 
     const prodLakeIds = new Set((prodLakes ?? []).map((lake) => lake.id));
-    const { data: devLakes, error: devLakesError } = await supabase
-      .from("dev_lakes")
-      .select("id");
-
-    if (devLakesError) {
-      throw devLakesError;
-    }
-
-    const staleDevLakeIds = (devLakes ?? [])
-      .map((lake) => lake.id)
-      .filter((id) => !prodLakeIds.has(id));
-
-    if (staleDevLakeIds.length) {
-      const { error: staleDeleteError } = await supabase
-        .from("dev_lakes")
-        .delete()
-        .in("id", staleDevLakeIds);
-
-      if (staleDeleteError) {
-        throw staleDeleteError;
-      }
-    }
 
     if (prodLakes?.length) {
       const devLakesToUpsert = prodLakes.map((lake) => ({
@@ -167,21 +145,6 @@ serve(async (req) => {
       lakes: prodLakes?.length ?? 0,
       scores: devScoresToInsert.length,
     };
-  }
-
-  if (mode === "dev") {
-    try {
-      const synced = await syncDevFromProd();
-      return new Response(
-        JSON.stringify({ success: true, mode, mirroredFromProd: true, synced }),
-        { headers: { "Content-Type": "application/json" } }
-      );
-    } catch (err) {
-      return new Response(
-        JSON.stringify({ success: false, mode, mirroredFromProd: true, error: errorMessage(err) }),
-        { status: 500, headers: { "Content-Type": "application/json" } }
-      );
-    }
   }
 
   function calculateCarpScore(weather: {
@@ -430,10 +393,12 @@ serve(async (req) => {
 
   let syncedDev: { lakes: number; scores: number } | null = null;
   let syncDevError: string | null = null;
-  try {
-    syncedDev = await syncDevFromProd();
-  } catch (err) {
-    syncDevError = errorMessage(err);
+  if (mode !== "dev") {
+    try {
+      syncedDev = await syncDevFromProd();
+    } catch (err) {
+      syncDevError = errorMessage(err);
+    }
   }
 
   return new Response(
