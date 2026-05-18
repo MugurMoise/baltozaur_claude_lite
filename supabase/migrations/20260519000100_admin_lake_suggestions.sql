@@ -80,3 +80,5 @@ create policy "Admin dev lake suggestions update"
       where au.user_id = auth.uid()
     )
   );
+
+-- Re-run admin suggestion policies after deployment workflow hardening.
