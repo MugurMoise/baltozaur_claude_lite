@@ -70,7 +70,20 @@ jobs:
         run: timeout 120s supabase --debug --dns-resolver https link --project-ref "$SUPABASE_PROJECT_REF" --password "$SUPABASE_DB_PASSWORD" --skip-pooler
 
       - name: Push database migrations
-        run: yes | supabase --debug --dns-resolver https db push
+        shell: bash
+        run: |
+          set +e
+          output="$(yes | supabase --debug --dns-resolver https db push 2>&1)"
+          status=$?
+          echo "$output"
+          if [ "$status" -ne 0 ]; then
+            message="$(echo "$output" | tail -n 25)"
+            message="${message//'%'/'%25'}"
+            message="${message//$'\n'/'%0A'}"
+            message="${message//$'\r'/'%0D'}"
+            echo "::error title=Supabase db push failed::$message"
+            exit "$status"
+          fi
 
       - name: Deploy Edge Functions
         if: github.ref_name == 'main' || github.ref_name == 'dev'
