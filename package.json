@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "import:lakes": "node scripts/import-lakes-csv.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
