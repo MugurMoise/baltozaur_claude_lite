@@ -13,6 +13,7 @@ import { getLocalDateKey } from './lib/date';
 import { createLakeCodeMap } from './lib/lakeLinks';
 import { SocialSignalsPage } from './pages/SocialSignalsPage';
 import { AddLakePage } from './pages/AddLakePage';
+import { AdminSuggestionsPage } from './pages/AdminSuggestionsPage';
 
 type Tab    = 'list' | 'map';
 type Filter = 'all' | 'excellent' | 'improving';
@@ -34,6 +35,9 @@ function distanceBetweenKm(from: UserLocation, to: UserLocation) {
 export default function App() {
   if (window.location.pathname.startsWith('/social')) {
     return <SocialSignalsPage />;
+  }
+  if (window.location.pathname.startsWith('/admin/suggestions')) {
+    return <AdminSuggestionsPage />;
   }
   if (window.location.pathname.startsWith('/suggest-lake') || window.location.pathname.startsWith('/add-lake')) {
     return <AddLakePage />;
