@@ -13,6 +13,10 @@ on:
       - '.github/workflows/supabase.yml'
   workflow_dispatch:
 
+concurrency:
+  group: supabase-${{ github.ref_name }}
+  cancel-in-progress: true
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -32,7 +36,7 @@ jobs:
       - name: Set up Supabase CLI
         uses: supabase/setup-cli@v2
         with:
-          version: latest
+          version: 2.98.2
 
       - name: Validate required secrets
         run: |
@@ -63,12 +67,28 @@ jobs:
           ./scripts/validate-dev-migrations.sh "${files[@]}"
 
       - name: Link Supabase project
-        run: supabase link --project-ref "$SUPABASE_PROJECT_REF" --password "$SUPABASE_DB_PASSWORD"
+        run: timeout 180s supabase --debug --dns-resolver https link --project-ref "$SUPABASE_PROJECT_REF" --password "$SUPABASE_DB_PASSWORD"
 
       - name: Push database migrations
         if: steps.migrations.outputs.files != ''
-        run: printf 'y\n' | supabase db push
+        shell: bash
+        run: |
+          set +e
+          output="$(printf 'y\n' | supabase --debug --dns-resolver https db push 2>&1)"
+          status=$?
+          echo "$output"
+          if [ "$status" -ne 0 ]; then
+            message="$(echo "$output" | grep -Ei 'ERROR|SQLSTATE|failed|syntax|violates|permission|denied|owner|At statement|ErrorResponse' | tail -n 20)"
+            if [ -z "$message" ]; then
+              message="$(echo "$output" | tail -n 20)"
+            fi
+            message="${message//'%'/'%25'}"
+            message="${message//$'\n'/'%0A'}"
+            message="${message//$'\r'/'%0D'}"
+            echo "::error title=Supabase db push failed::$message"
+            exit "$status"
+          fi
 
       - name: Deploy Edge Functions
         if: github.ref_name == 'main' || github.ref_name == 'dev'
-        run: supabase functions deploy --project-ref "$SUPABASE_PROJECT_REF"
+        run: supabase --debug --dns-resolver https functions deploy --project-ref "$SUPABASE_PROJECT_REF"
