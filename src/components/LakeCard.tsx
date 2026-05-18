@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { LakeScore } from '../types/lake';
 import { getScoreColor, getScoreGradient, getScoreLevel, getRecommendation, getConditionTags } from '../types/lake';
 import type { Lang } from '../i18n';
@@ -9,6 +9,8 @@ interface Props {
   rank?: number;
   lang: Lang;
   userLocation?: { lat: number; lon: number } | null;
+  highlighted?: boolean;
+  shareCode?: string;
 }
 
 function distanceBetweenKm(from: { lat: number; lon: number }, to: { lat: number; lon: number }) {
@@ -41,8 +43,9 @@ function parseFeedingWindow(window: string) {
   };
 }
 
-export function LakeCard({ lake, rank, lang, userLocation }: Props) {
-  const [expanded, setExpanded] = useState(false);
+export function LakeCard({ lake, rank, lang, userLocation, highlighted = false, shareCode }: Props) {
+  const [expanded, setExpanded] = useState(highlighted);
+  const [copied, setCopied] = useState(false);
   const tr = t[lang];
   const level = getScoreLevel(lake.score);
   const scoreColor = getScoreColor(lake.score);
@@ -56,14 +59,36 @@ export function LakeCard({ lake, rank, lang, userLocation }: Props) {
     ? lake.county
     : `${lake.county} · ${userDistance} ${tr.distanceFromYou}`;
   const websiteHref = lake.website_url ?? lake.facebook_url;
+  const websiteLabel = lake.website_url ?? lake.facebook_url?.replace(/^https?:\/\/(www\.)?/i, '') ?? '';
   const phoneNumbers = lake.phone?.split(/[,/]/).map((phone) => phone.trim()).filter(Boolean) ?? [];
   const hasRainWarning = (lake.precipitation ?? 0) > 0 || (lake.rain_hours ?? 0) > 0;
+  const shareUrl = useMemo(() => {
+    const url = new URL(window.location.href);
+    url.search = '';
+    url.hash = '';
+    url.searchParams.set('l', shareCode ?? lake.lake_id);
+    return url.toString();
+  }, [lake.lake_id, shareCode]);
 
   const isGood = level === 'excellent' || level === 'veryGood' || level === 'good';
 
+  useEffect(() => {
+    if (highlighted) setExpanded(true);
+  }, [highlighted]);
+
+  const copyShareLink = async () => {
+    await navigator.clipboard?.writeText(shareUrl);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1600);
+  };
+
   return (
     <article
-      className={`relative rounded-3xl overflow-hidden border border-white/10 bg-gradient-to-br ${gradient} backdrop-blur-sm shadow-xl transition-all duration-300 active:scale-[0.99]`}
+      id={`lake-${lake.lake_id}`}
+      data-lake-code={shareCode}
+      className={`relative scroll-mt-5 rounded-3xl overflow-hidden border bg-gradient-to-br ${gradient} backdrop-blur-sm shadow-xl transition-all duration-300 active:scale-[0.99] ${
+        highlighted ? 'border-cyan-300/70 ring-2 ring-cyan-300/35' : 'border-white/10'
+      }`}
     >
       {/* Score bar at top */}
       <div className="h-1 w-full" style={{ background: `linear-gradient(90deg, transparent, ${scoreColor}, transparent)` }} />
@@ -154,6 +179,14 @@ export function LakeCard({ lake, rank, lang, userLocation }: Props) {
         {/* Technical details — collapsed by default */}
         {expanded && (
           <div className="mt-4 pt-4 border-t border-white/10 animate-fade-in">
+            <button
+              onClick={copyShareLink}
+              className="mb-4 flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 text-sm font-semibold text-slate-200 transition-all hover:bg-white/[0.07] hover:text-white active:scale-[0.99]"
+            >
+              <span>{copied ? '✓' : '🔗'}</span>
+              <span>{copied ? tr.linkCopied : tr.copyLink}</span>
+            </button>
+
             {conditionTags.length > 0 && (
               <div className="mb-4">
                 <p className="text-[10px] text-slate-500 uppercase tracking-wider font-body mb-2">
@@ -244,9 +277,9 @@ export function LakeCard({ lake, rank, lang, userLocation }: Props) {
                     href={websiteHref}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-sm font-body text-slate-200 hover:text-white"
+                    className="break-words text-sm font-body text-slate-200 hover:text-white"
                   >
-                    {lake.website_url ? tr.website : 'Facebook'}
+                    {websiteLabel}
                   </a>
                 ) : (
                   <span className="text-sm font-body text-slate-500">{tr.unavailable}</span>

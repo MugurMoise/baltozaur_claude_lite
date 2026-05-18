@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useLakes } from './hooks/useLakes';
 import type { Lang } from './i18n';
 import { getLocale, t } from './i18n';
@@ -10,12 +10,26 @@ import { StatsBar } from './components/StatsBar';
 import { BestFeedingSection } from './components/BestFeedingSection';
 import { HowItWorks } from './components/HowItWorks';
 import { getLocalDateKey } from './lib/date';
+import { createLakeCodeMap } from './lib/lakeLinks';
 import { SocialSignalsPage } from './pages/SocialSignalsPage';
 import { AddLakePage } from './pages/AddLakePage';
 
 type Tab    = 'list' | 'map';
 type Filter = 'all' | 'excellent' | 'improving';
+type AreaMode = 'county' | 'distance';
 type UserLocation = { lat: number; lon: number };
+
+function distanceBetweenKm(from: UserLocation, to: UserLocation) {
+  const earthRadiusKm = 6371;
+  const toRad = (value: number) => value * Math.PI / 180;
+  const dLat = toRad(to.lat - from.lat);
+  const dLon = toRad(to.lon - from.lon);
+  const lat1 = toRad(from.lat);
+  const lat2 = toRad(to.lat);
+  const a = Math.sin(dLat / 2) ** 2
+    + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
+  return earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
 
 export default function App() {
   if (window.location.pathname.startsWith('/social')) {
@@ -40,17 +54,64 @@ function DashboardApp() {
 
   const [tab, setTab]       = useState<Tab>('list');
   const [filter, setFilter] = useState<Filter>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [areaMode, setAreaMode] = useState<AreaMode>('county');
+  const [selectedCounty, setSelectedCounty] = useState('all');
+  const [maxDistanceKm, setMaxDistanceKm] = useState(75);
   const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
   const [locationStatus, setLocationStatus] = useState<'idle' | 'loading' | 'denied'>('idle');
 
   const today   = getLocalDateKey();
   const isToday = selectedDay === today;
+  const linkedLakeParam = useMemo(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('l') ?? params.get('lake');
+  }, []);
+  const lakeCodes = useMemo(() => createLakeCodeMap(lakes), [lakes]);
 
-  const filtered = lakes.filter((l) => {
-    if (filter === 'excellent') return l.score >= 55;
-    if (filter === 'improving') return (l.pressure_delta ?? 0) < -0.5 || (l.temperature_delta ?? 0) < -0.2;
+  const counties = useMemo(() => {
+    return Array.from(new Set(lakes.map((lake) => lake.county).filter(Boolean))).sort((a, b) => (
+      a.localeCompare(b, locale)
+    ));
+  }, [lakes, locale]);
+
+  const filtered = lakes.filter((lake) => {
+    const query = searchQuery.trim().toLowerCase();
+    if (query && !`${lake.name} ${lake.county}`.toLowerCase().includes(query)) return false;
+
+    if (areaMode === 'county' && selectedCounty !== 'all' && lake.county !== selectedCounty) return false;
+
+    if (areaMode === 'distance') {
+      if (!userLocation) return false;
+      const distance = distanceBetweenKm(userLocation, { lat: lake.lat, lon: lake.lon });
+      if (distance > maxDistanceKm) return false;
+    }
+
+    if (filter === 'excellent') return lake.score >= 55;
+    if (filter === 'improving') return (lake.pressure_delta ?? 0) < -0.5 || (lake.temperature_delta ?? 0) < -0.2;
     return true;
   });
+
+  const visibleLakes = useMemo(() => {
+    if (!linkedLakeParam) return filtered;
+    const linkedLake = filtered.find((lake) => (
+      lake.lake_id === linkedLakeParam ||
+      lake.id === linkedLakeParam ||
+      lakeCodes.get(lake.lake_id) === linkedLakeParam
+    ));
+    if (!linkedLake) return filtered;
+    return [linkedLake, ...filtered.filter((lake) => lake.lake_id !== linkedLake.lake_id)];
+  }, [filtered, lakeCodes, linkedLakeParam]);
+
+  useEffect(() => {
+    if (!linkedLakeParam || loading) return;
+    const timeout = window.setTimeout(() => {
+      const selector = `[data-lake-code="${linkedLakeParam}"], #lake-${linkedLakeParam}`;
+      document.querySelector(selector)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 150);
+
+    return () => window.clearTimeout(timeout);
+  }, [linkedLakeParam, loading]);
 
   const forecastDateLabel = (() => {
     if (!selectedDay) return '';
@@ -119,21 +180,6 @@ function DashboardApp() {
           {/* How it works */}
           <HowItWorks lang={lang} />
 
-          {!userLocation && (
-            <div className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3">
-              <span className="text-sm text-slate-300 font-body">
-                {locationStatus === 'denied' ? tr.locationDenied : tr.useMyLocation}
-              </span>
-              <button
-                onClick={requestLocation}
-                disabled={locationStatus === 'loading'}
-                className="shrink-0 rounded-xl border border-lake-500/40 bg-lake-600/25 px-3 py-2 text-sm font-semibold text-white transition-all hover:bg-lake-600/40 disabled:opacity-60"
-              >
-                {locationStatus === 'loading' ? '...' : tr.useMyLocation}
-              </button>
-            </div>
-          )}
-
           {loading ? (
             <div className="space-y-4">
               {[...Array(4)].map((_, i) => (
@@ -145,6 +191,85 @@ function DashboardApp() {
             <>
               {/* Summary stats */}
               <StatsBar lakes={lakes} lang={lang} />
+
+              <section className="rounded-2xl border border-white/10 bg-white/[0.035] p-3 space-y-3">
+                <div className="relative">
+                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">
+                    🔎
+                  </span>
+                  <input
+                    value={searchQuery}
+                    onChange={(event) => setSearchQuery(event.target.value)}
+                    placeholder={tr.searchPlaceholder}
+                    className="w-full rounded-xl border border-white/10 bg-mud-950/55 py-3 pl-10 pr-3 text-sm text-white placeholder:text-slate-500 outline-none transition-all focus:border-lake-400/60 focus:bg-mud-950/75"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  {([
+                    { key: 'county', label: tr.areaByCounty },
+                    { key: 'distance', label: tr.areaByDistance },
+                  ] as { key: AreaMode; label: string }[]).map(({ key, label }) => (
+                    <button
+                      key={key}
+                      onClick={() => setAreaMode(key)}
+                      className={`rounded-xl border px-3 py-2.5 text-sm font-semibold transition-all ${
+                        areaMode === key
+                          ? 'border-lake-500/50 bg-lake-600/25 text-white'
+                          : 'border-white/10 bg-white/[0.03] text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+
+                {areaMode === 'county' ? (
+                  <select
+                    value={selectedCounty}
+                    onChange={(event) => setSelectedCounty(event.target.value)}
+                    className="w-full rounded-xl border border-white/10 bg-mud-950/70 px-3 py-3 text-sm text-white outline-none focus:border-lake-400/60"
+                  >
+                    <option value="all">{tr.allCounties}</option>
+                    {counties.map((county) => (
+                      <option key={county} value={county}>{county}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-4 gap-2">
+                      {[25, 50, 75, 100].map((distance) => (
+                        <button
+                          key={distance}
+                          onClick={() => setMaxDistanceKm(distance)}
+                          className={`rounded-xl border px-2 py-2 text-sm font-semibold transition-all ${
+                            maxDistanceKm === distance
+                              ? 'border-lake-500/50 bg-lake-600/25 text-white'
+                              : 'border-white/10 bg-white/[0.03] text-slate-400 hover:text-white'
+                          }`}
+                        >
+                          {distance} km
+                        </button>
+                      ))}
+                    </div>
+
+                    {!userLocation && (
+                      <div className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-mud-950/45 px-3 py-3">
+                        <span className="text-sm text-slate-300">
+                          {locationStatus === 'denied' ? tr.locationDenied : tr.locationNeeded}
+                        </span>
+                        <button
+                          onClick={requestLocation}
+                          disabled={locationStatus === 'loading'}
+                          className="shrink-0 rounded-xl border border-lake-500/40 bg-lake-600/25 px-3 py-2 text-sm font-semibold text-white transition-all hover:bg-lake-600/40 disabled:opacity-60"
+                        >
+                          {locationStatus === 'loading' ? '...' : tr.useMyLocation}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </section>
 
               {/* Tabs */}
               <div className="flex gap-1.5 bg-white/[0.03] rounded-2xl p-1.5 border border-white/8">
@@ -164,7 +289,7 @@ function DashboardApp() {
               </div>
 
               {tab === 'map' ? (
-                <LakeMap lakes={lakes} />
+                <LakeMap lakes={visibleLakes} />
               ) : (
                 <>
                   {/* Filter chips */}
@@ -191,17 +316,32 @@ function DashboardApp() {
                   {/* Section title */}
                   <h2 className="font-display text-xl text-white tracking-wide flex items-center gap-2">
                     <span>{isToday ? '🏆' : '📅'}</span>
-                    <span className="capitalize">
+                    <span className="capitalize flex-1">
                       {isToday ? tr.topLakesToday : `${tr.forecastTitle} ${forecastDateLabel}`}
+                    </span>
+                    <span className="text-xs font-body font-normal text-slate-500">
+                      {visibleLakes.length}/{lakes.length}
                     </span>
                   </h2>
 
                   {/* Lake cards */}
                   <div className="space-y-4">
-                    {filtered.length > 0 ? (
-                      filtered.map((lake, i) => (
-                        <LakeCard key={lake.id} lake={lake} rank={i + 1} lang={lang} userLocation={userLocation} />
-                      ))
+                    {visibleLakes.length > 0 ? (
+                      visibleLakes.map((lake, i) => {
+                        const shareCode = lakeCodes.get(lake.lake_id);
+                        const isLinkedLake = linkedLakeParam === lake.lake_id || linkedLakeParam === lake.id || linkedLakeParam === shareCode;
+                        return (
+                          <LakeCard
+                            key={lake.id}
+                            lake={lake}
+                            rank={i + 1}
+                            lang={lang}
+                            userLocation={userLocation}
+                            highlighted={isLinkedLake}
+                            shareCode={shareCode}
+                          />
+                        );
+                      })
                     ) : (
                       <div className="text-center py-16 text-slate-500 font-body">
                         <p className="text-4xl mb-4">🎣</p>
@@ -211,7 +351,7 @@ function DashboardApp() {
                   </div>
 
                   {/* Best feeding windows */}
-                  <BestFeedingSection lakes={lakes} lang={lang} />
+                  <BestFeedingSection lakes={visibleLakes} lang={lang} />
                 </>
               )}
 
