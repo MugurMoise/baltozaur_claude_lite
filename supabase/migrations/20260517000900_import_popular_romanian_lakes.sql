@@ -1,5 +1,8 @@
 -- Import popular Romanian fishing lakes from curated CSV.
 
+alter table if exists public.lakes
+  add column if not exists description text;
+
 with new_lakes (
   name,
   county,
