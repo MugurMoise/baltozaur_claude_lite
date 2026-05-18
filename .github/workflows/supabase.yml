@@ -77,7 +77,7 @@ jobs:
           status=$?
           echo "$output"
           if [ "$status" -ne 0 ]; then
-            message="$(echo "$output" | grep -Ei 'ERROR|SQLSTATE|failed|column|relation|syntax|violates|At statement' | tail -n 20)"
+            message="$(echo "$output" | grep -Ei 'ERROR|SQLSTATE|failed|syntax|violates|permission|denied|owner|At statement|ErrorResponse' | tail -n 20)"
             if [ -z "$message" ]; then
               message="$(echo "$output" | tail -n 20)"
             fi
