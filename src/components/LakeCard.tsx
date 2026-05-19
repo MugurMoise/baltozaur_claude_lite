@@ -55,9 +55,10 @@ export function LakeCard({ lake, rank, lang, userLocation, highlighted = false, 
   const userDistance = userLocation
     ? Math.round(distanceBetweenKm(userLocation, { lat: lake.lat, lon: lake.lon }))
     : null;
+  const areaLabel = lang === 'ro' ? lake.county : (lake.region ?? lake.county);
   const locationLabel = userDistance == null
-    ? lake.county
-    : `${lake.county} · ${userDistance} ${tr.distanceFromYou}`;
+    ? areaLabel
+    : `${areaLabel} · ${userDistance} ${tr.distanceFromYou}`;
   const websiteHref = lake.website_url ?? lake.facebook_url;
   const websiteLabel = lake.website_url ?? lake.facebook_url?.replace(/^https?:\/\/(www\.)?/i, '') ?? '';
   const phoneNumbers = lake.phone?.split(/[,/]/).map((phone) => phone.trim()).filter(Boolean) ?? [];

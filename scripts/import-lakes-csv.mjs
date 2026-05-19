@@ -137,9 +137,12 @@ function toLake(row) {
     row.source_date ? `verificat/extras la ${row.source_date}` : null,
   ].filter(Boolean);
 
+  const county = nullable(row.county) ?? 'Necunoscut';
   return {
     name: nullable(row.name),
-    county: nullable(row.county) ?? 'Necunoscut',
+    county,
+    country: nullable(row.country) ?? 'RO',
+    region: nullable(row.region) ?? county,
     distance_km: numberOrNull(row.distance_km),
     lat: numberOrNull(row.lat),
     lon: numberOrNull(row.lon),

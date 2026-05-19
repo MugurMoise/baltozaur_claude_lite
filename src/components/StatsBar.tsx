@@ -26,12 +26,12 @@ export function StatsBar({ lakes, lang }: Props) {
         <div className="border-x border-white/10">
           <div className="text-2xl font-mono font-bold text-white">{recommended}</div>
           <div className="text-xs text-slate-500 font-body mt-1">{tr.activeLakes}</div>
-          <div className="text-xs text-slate-600 font-body">din {lakes.length}</div>
+          <div className="text-xs text-slate-600 font-body">{recommended}/{lakes.length}</div>
         </div>
         <div>
           <div className="text-2xl font-mono font-bold text-cyan-400">{withWindows}</div>
           <div className="text-xs text-slate-500 font-body mt-1">{tr.withWindows}</div>
-          <div className="text-xs text-slate-600 font-body">lacuri</div>
+          <div className="text-xs text-slate-600 font-body">{tr.lakes}</div>
         </div>
       </div>
     </div>
