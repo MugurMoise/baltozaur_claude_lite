@@ -31,8 +31,6 @@ select distinct on (s.lake_id)
   s.calculated_at,
   l.name,
   l.county,
-  l.country,
-  l.region,
   l.distance_km,
   l.lat,
   l.lon,
@@ -41,6 +39,8 @@ select distinct on (s.lake_id)
   l.website_url,
   l.facebook_url,
   l.phone,
+  l.country,
+  l.region,
   l.description,
   l.rules,
   l.price
