@@ -24,6 +24,7 @@ type InternationalAreaPreference =
   | { mode: 'location'; country: string; region: string; lat: number; lon: number };
 
 const INTERNATIONAL_AREA_STORAGE_KEY = 'baltozaur_international_area';
+const MAX_VISIBLE_LAKES = 40;
 
 function normaliseCountry(value: string) {
   const trimmed = value.trim();
@@ -158,14 +159,15 @@ function DashboardApp() {
   });
 
   const visibleLakes = useMemo(() => {
-    if (!linkedLakeParam) return filtered;
+    const limited = filtered.slice(0, MAX_VISIBLE_LAKES);
+    if (!linkedLakeParam) return limited;
     const linkedLake = filtered.find((lake) => (
       lake.lake_id === linkedLakeParam ||
       lake.id === linkedLakeParam ||
       lakeCodes.get(lake.lake_id) === linkedLakeParam
     ));
-    if (!linkedLake) return filtered;
-    return [linkedLake, ...filtered.filter((lake) => lake.lake_id !== linkedLake.lake_id)];
+    if (!linkedLake) return limited;
+    return [linkedLake, ...filtered.filter((lake) => lake.lake_id !== linkedLake.lake_id)].slice(0, MAX_VISIBLE_LAKES);
   }, [filtered, lakeCodes, linkedLakeParam]);
 
   useEffect(() => {
@@ -511,7 +513,7 @@ function DashboardApp() {
                       {isToday ? tr.topLakesToday : `${tr.forecastTitle} ${forecastDateLabel}`}
                     </span>
                     <span className="text-xs font-body font-normal text-slate-500">
-                      {visibleLakes.length}/{lakes.length}
+                      {visibleLakes.length}/{filtered.length}
                     </span>
                   </h2>
 
