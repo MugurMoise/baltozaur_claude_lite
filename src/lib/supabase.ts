@@ -201,6 +201,8 @@ const SAMPLE_DAYS = [0, 1, 2, 3, 4].map((offset) => {
 });
 
 const sampleContact = {
+  country: 'RO',
+  region: null,
   precipitation: 0,
   rain_hours: 0,
   website_url: null,
@@ -289,6 +291,8 @@ export async function fetchLakeScoresForDay(day: string): Promise<LakeScore[]> {
       ${tables.lakes} (
         name,
         county,
+        country,
+        region,
         distance_km,
         website_url,
         facebook_url,
@@ -326,6 +330,8 @@ export async function fetchLakeScoresForDay(day: string): Promise<LakeScore[]> {
         ${tables.lakes} (
           name,
           county,
+          country,
+          region,
           distance_km,
           website_url,
           facebook_url,
@@ -360,6 +366,8 @@ export async function fetchLakeScoresForDay(day: string): Promise<LakeScore[]> {
         ${tables.lakes} (
           name,
           county,
+          country,
+          region,
           distance_km,
           lat,
           lon
@@ -403,6 +411,8 @@ export async function fetchLakeScoresForDay(day: string): Promise<LakeScore[]> {
     feeding_windows: normaliseFeedingWindows(row.feeding_windows),
     name: row[tables.lakes]?.name ?? 'Unknown',
     county: row[tables.lakes]?.county ?? '—',
+    country: row[tables.lakes]?.country ?? 'RO',
+    region: row[tables.lakes]?.region ?? row[tables.lakes]?.county ?? null,
     distance_km: row[tables.lakes]?.distance_km ?? null,
     website_url: row[tables.lakes]?.website_url ?? null,
     facebook_url: row[tables.lakes]?.facebook_url ?? null,
@@ -445,6 +455,8 @@ export async function fetchLakeScores(): Promise<LakeScore[]> {
     description: row.description ?? null,
     rules: row.rules ?? null,
     price: row.price ?? null,
+    country: row.country ?? 'RO',
+    region: row.region ?? row.county ?? null,
     pressure_delta: row.pressure_delta ?? 0,
     temperature_delta: row.temperature_delta ?? 0,
     feeding_windows: normaliseFeedingWindows(row.feeding_windows),

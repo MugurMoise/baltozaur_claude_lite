@@ -17,6 +17,8 @@ export interface LakeScore {
   feeding_windows: string[] | null;
   name: string;
   county: string;
+  country: string;
+  region: string | null;
   distance_km: number | null;
   website_url: string | null;
   facebook_url: string | null;

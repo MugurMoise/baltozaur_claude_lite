@@ -1,5 +1,5 @@
 import { FormEvent, useState } from 'react';
-import { supabase, tables } from '../../lib/supabase';
+import { isDevEnvironment, supabase } from '../../lib/supabase';
 import { FormField } from './FormField';
 import { SubmitButton } from './SubmitButton';
 import { Toast } from './Toast';
@@ -12,6 +12,7 @@ interface FormState {
   website_url: string;
   facebook_url: string;
   phone: string;
+  submitter_email: string;
   notes: string;
 }
 
@@ -23,6 +24,7 @@ const initialState: FormState = {
   website_url: '',
   facebook_url: '',
   phone: '',
+  submitter_email: '',
   notes: '',
 };
 
@@ -54,21 +56,28 @@ export function AddLakeForm() {
     }
 
     setLoading(true);
-    const { error } = await supabase.from(tables.lakeSuggestions).insert({
-      name: form.name.trim(),
-      county: form.county.trim() || null,
-      lat,
-      lon,
-      website_url: form.website_url.trim() || null,
-      facebook_url: form.facebook_url.trim() || null,
-      phone: form.phone.trim() || null,
-      notes: form.notes.trim() || null,
-      status: 'pending',
+    const { data, error } = await supabase.functions.invoke('submit-lake-suggestion', {
+      body: {
+        appEnv: isDevEnvironment ? 'dev' : 'prod',
+        name: form.name.trim(),
+        county: form.county.trim() || null,
+        lat,
+        lon,
+        website_url: form.website_url.trim() || null,
+        facebook_url: form.facebook_url.trim() || null,
+        phone: form.phone.trim() || null,
+        submitter_email: form.submitter_email.trim() || null,
+        notes: form.notes.trim() || null,
+      },
     });
     setLoading(false);
 
     if (error) {
       setToast({ type: 'error', message: error.message });
+      return;
+    }
+    if (data && typeof data === 'object' && 'error' in data) {
+      setToast({ type: 'error', message: String(data.error) });
       return;
     }
 
@@ -96,6 +105,7 @@ export function AddLakeForm() {
         <FormField label="Site" props={{ value: form.website_url, onChange: (event) => updateField('website_url', event.target.value), placeholder: 'https://...' }} />
         <FormField label="Facebook" props={{ value: form.facebook_url, onChange: (event) => updateField('facebook_url', event.target.value), placeholder: 'https://facebook.com/...' }} />
         <FormField label="Telefon" props={{ value: form.phone, onChange: (event) => updateField('phone', event.target.value) }} />
+        <FormField label="Email pentru confirmare" props={{ value: form.submitter_email, onChange: (event) => updateField('submitter_email', event.target.value), type: 'email', placeholder: 'nume@email.ro' }} />
         <FormField
           as="textarea"
           label="Observatii"
@@ -105,6 +115,9 @@ export function AddLakeForm() {
             placeholder: 'Ex: program, taxa, regulile baltii, link Google Maps...',
           }}
         />
+        <p className="text-xs leading-relaxed text-slate-500">
+          Pentru prevenirea abuzului salvam IP-ul si informatii tehnice ale browserului impreuna cu sugestia.
+        </p>
         <SubmitButton loading={loading} label="Trimite sugestia" loadingLabel="Se trimite..." />
       </form>
 

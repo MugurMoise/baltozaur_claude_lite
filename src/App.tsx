@@ -13,11 +13,53 @@ import { getLocalDateKey } from './lib/date';
 import { createLakeCodeMap } from './lib/lakeLinks';
 import { SocialSignalsPage } from './pages/SocialSignalsPage';
 import { AddLakePage } from './pages/AddLakePage';
+import { AdminSuggestionsPage } from './pages/AdminSuggestionsPage';
 
 type Tab    = 'list' | 'map';
 type Filter = 'all' | 'excellent' | 'improving';
 type AreaMode = 'county' | 'distance';
 type UserLocation = { lat: number; lon: number };
+type InternationalAreaPreference =
+  | { mode: 'region'; country: string; region: string }
+  | { mode: 'location'; country: string; region: string; lat: number; lon: number };
+
+const INTERNATIONAL_AREA_STORAGE_KEY = 'baltozaur_international_area';
+const MAX_VISIBLE_LAKES = 40;
+
+function normaliseCountry(value: string) {
+  const trimmed = value.trim();
+  const aliases: Record<string, string> = {
+    romania: 'RO',
+    roumania: 'RO',
+    ro: 'RO',
+    uk: 'GB',
+    'united kingdom': 'GB',
+    britain: 'GB',
+    england: 'GB',
+    france: 'FR',
+    germany: 'DE',
+    deutschland: 'DE',
+    allemagne: 'DE',
+  };
+  return aliases[trimmed.toLowerCase()] ?? trimmed.toUpperCase();
+}
+
+function readInternationalPreference(): InternationalAreaPreference | null {
+  try {
+    const raw = window.localStorage.getItem(INTERNATIONAL_AREA_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as InternationalAreaPreference;
+    if (parsed.mode === 'location' && Number.isFinite(parsed.lat) && Number.isFinite(parsed.lon)) return parsed;
+    if (parsed.mode === 'region' && parsed.country) return parsed;
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+function saveInternationalPreference(preference: InternationalAreaPreference) {
+  window.localStorage.setItem(INTERNATIONAL_AREA_STORAGE_KEY, JSON.stringify(preference));
+}
 
 function distanceBetweenKm(from: UserLocation, to: UserLocation) {
   const earthRadiusKm = 6371;
@@ -34,6 +76,9 @@ function distanceBetweenKm(from: UserLocation, to: UserLocation) {
 export default function App() {
   if (window.location.pathname.startsWith('/social')) {
     return <SocialSignalsPage />;
+  }
+  if (window.location.pathname.startsWith('/admin/suggestions')) {
+    return <AdminSuggestionsPage />;
   }
   if (window.location.pathname.startsWith('/suggest-lake') || window.location.pathname.startsWith('/add-lake')) {
     return <AddLakePage />;
@@ -60,6 +105,10 @@ function DashboardApp() {
   const [maxDistanceKm, setMaxDistanceKm] = useState(75);
   const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
   const [locationStatus, setLocationStatus] = useState<'idle' | 'loading' | 'denied'>('idle');
+  const [internationalPreference, setInternationalPreference] = useState<InternationalAreaPreference | null>(() => readInternationalPreference());
+  const [showInternationalPrompt, setShowInternationalPrompt] = useState(false);
+  const [countryInput, setCountryInput] = useState('');
+  const [regionInput, setRegionInput] = useState('');
 
   const today   = getLocalDateKey();
   const isToday = selectedDay === today;
@@ -69,21 +118,38 @@ function DashboardApp() {
   }, []);
   const lakeCodes = useMemo(() => createLakeCodeMap(lakes), [lakes]);
 
-  const counties = useMemo(() => {
-    return Array.from(new Set(lakes.map((lake) => lake.county).filter(Boolean))).sort((a, b) => (
+  const isInternational = lang !== 'ro';
+  const activeLocation = isInternational && internationalPreference?.mode === 'location'
+    ? { lat: internationalPreference.lat, lon: internationalPreference.lon }
+    : userLocation;
+
+  const regions = useMemo(() => {
+    const country = isInternational && internationalPreference ? internationalPreference.country : null;
+    return Array.from(new Set(lakes
+      .filter((lake) => !country || (lake.country ?? 'RO').toUpperCase() === country)
+      .map((lake) => (isInternational ? (lake.region ?? lake.county) : lake.county))
+      .filter(Boolean)
+    )).sort((a, b) => (
       a.localeCompare(b, locale)
     ));
-  }, [lakes, locale]);
+  }, [internationalPreference, isInternational, lakes, locale]);
 
   const filtered = lakes.filter((lake) => {
     const query = searchQuery.trim().toLowerCase();
-    if (query && !`${lake.name} ${lake.county}`.toLowerCase().includes(query)) return false;
+    const lakeCountry = (lake.country ?? 'RO').toUpperCase();
+    const lakeRegion = lake.region ?? lake.county;
+    if (query && !`${lake.name} ${lake.county} ${lakeRegion} ${lakeCountry}`.toLowerCase().includes(query)) return false;
 
-    if (areaMode === 'county' && selectedCounty !== 'all' && lake.county !== selectedCounty) return false;
+    if (isInternational && internationalPreference) {
+      if (lakeCountry !== internationalPreference.country) return false;
+      if (internationalPreference.mode === 'region' && internationalPreference.region && lakeRegion !== internationalPreference.region) return false;
+    }
+
+    if (areaMode === 'county' && selectedCounty !== 'all' && lakeRegion !== selectedCounty) return false;
 
     if (areaMode === 'distance') {
-      if (!userLocation) return false;
-      const distance = distanceBetweenKm(userLocation, { lat: lake.lat, lon: lake.lon });
+      if (!activeLocation) return false;
+      const distance = distanceBetweenKm(activeLocation, { lat: lake.lat, lon: lake.lon });
       if (distance > maxDistanceKm) return false;
     }
 
@@ -93,14 +159,15 @@ function DashboardApp() {
   });
 
   const visibleLakes = useMemo(() => {
-    if (!linkedLakeParam) return filtered;
+    const limited = filtered.slice(0, MAX_VISIBLE_LAKES);
+    if (!linkedLakeParam) return limited;
     const linkedLake = filtered.find((lake) => (
       lake.lake_id === linkedLakeParam ||
       lake.id === linkedLakeParam ||
       lakeCodes.get(lake.lake_id) === linkedLakeParam
     ));
-    if (!linkedLake) return filtered;
-    return [linkedLake, ...filtered.filter((lake) => lake.lake_id !== linkedLake.lake_id)];
+    if (!linkedLake) return limited;
+    return [linkedLake, ...filtered.filter((lake) => lake.lake_id !== linkedLake.lake_id)].slice(0, MAX_VISIBLE_LAKES);
   }, [filtered, lakeCodes, linkedLakeParam]);
 
   useEffect(() => {
@@ -112,6 +179,21 @@ function DashboardApp() {
 
     return () => window.clearTimeout(timeout);
   }, [linkedLakeParam, loading]);
+
+  useEffect(() => {
+    if (lang === 'ro') {
+      setShowInternationalPrompt(false);
+      return;
+    }
+    setShowInternationalPrompt(!internationalPreference);
+  }, [internationalPreference, lang]);
+
+  const handleLangChange = (nextLang: Lang) => {
+    setLang(nextLang);
+    if (nextLang !== 'ro' && !internationalPreference) {
+      setShowInternationalPrompt(true);
+    }
+  };
 
   const forecastDateLabel = (() => {
     if (!selectedDay) return '';
@@ -139,6 +221,49 @@ function DashboardApp() {
     );
   };
 
+  const saveRegionPreference = () => {
+    const country = normaliseCountry(countryInput || (lang === 'en' ? 'GB' : lang.toUpperCase()));
+    const preference: InternationalAreaPreference = {
+      mode: 'region',
+      country,
+      region: regionInput.trim(),
+    };
+    saveInternationalPreference(preference);
+    setInternationalPreference(preference);
+    setSelectedCounty('all');
+    setAreaMode('county');
+    setShowInternationalPrompt(false);
+  };
+
+  const saveLocationPreference = () => {
+    if (!navigator.geolocation) {
+      setLocationStatus('denied');
+      return;
+    }
+
+    setLocationStatus('loading');
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const preference: InternationalAreaPreference = {
+          mode: 'location',
+          country: normaliseCountry(countryInput || (lang === 'en' ? 'GB' : lang.toUpperCase())),
+          region: regionInput.trim(),
+          lat: position.coords.latitude,
+          lon: position.coords.longitude,
+        };
+        saveInternationalPreference(preference);
+        setInternationalPreference(preference);
+        setUserLocation({ lat: preference.lat, lon: preference.lon });
+        setSelectedCounty('all');
+        setAreaMode('distance');
+        setLocationStatus('idle');
+        setShowInternationalPrompt(false);
+      },
+      () => setLocationStatus('denied'),
+      { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 }
+    );
+  };
+
   return (
     <div className="min-h-screen bg-mud-900 text-white font-body">
       {/* Ambient background */}
@@ -152,10 +277,10 @@ function DashboardApp() {
           lastUpdated={lastUpdated}
           refreshing={refreshing}
           onRefresh={refresh}
-          lakeCount={lakes.length}
+          lakeCount={isInternational && internationalPreference ? filtered.length : lakes.length}
           isToday={isToday}
           lang={lang}
-          onLangChange={setLang}
+          onLangChange={handleLangChange}
         />
 
         <main className="max-w-2xl mx-auto px-4 py-5 space-y-5">
@@ -165,6 +290,53 @@ function DashboardApp() {
               <span className="text-xl">⚠️</span>
               <span>{tr.errorLoad}</span>
             </div>
+          )}
+
+          {isInternational && showInternationalPrompt && (
+            <section className="rounded-2xl border border-lake-400/30 bg-mud-950/90 p-4 shadow-2xl space-y-4">
+              <div>
+                <h2 className="font-display text-xl text-white tracking-wide">{tr.internationalTitle}</h2>
+                <p className="mt-1 text-sm text-slate-400">{tr.internationalText}</p>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="space-y-1.5 text-sm text-slate-300">
+                  <span>{tr.countryLabel}</span>
+                  <input
+                    value={countryInput}
+                    onChange={(event) => setCountryInput(event.target.value)}
+                    placeholder={tr.countryPlaceholder}
+                    className="w-full rounded-xl border border-white/10 bg-mud-950/70 px-3 py-3 text-sm text-white placeholder:text-slate-500 outline-none focus:border-lake-400/60"
+                  />
+                </label>
+                <label className="space-y-1.5 text-sm text-slate-300">
+                  <span>{tr.regionLabel}</span>
+                  <input
+                    value={regionInput}
+                    onChange={(event) => setRegionInput(event.target.value)}
+                    placeholder={tr.regionPlaceholder}
+                    className="w-full rounded-xl border border-white/10 bg-mud-950/70 px-3 py-3 text-sm text-white placeholder:text-slate-500 outline-none focus:border-lake-400/60"
+                  />
+                </label>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <button
+                  onClick={saveRegionPreference}
+                  className="rounded-xl border border-lake-500/40 bg-lake-600/25 px-3 py-3 text-sm font-semibold text-white transition-all hover:bg-lake-600/40"
+                >
+                  {tr.saveArea}
+                </button>
+                <button
+                  onClick={saveLocationPreference}
+                  disabled={locationStatus === 'loading'}
+                  className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-3 text-sm font-semibold text-slate-200 transition-all hover:bg-white/[0.07] hover:text-white disabled:opacity-60"
+                >
+                  {locationStatus === 'loading' ? '...' : tr.useMyLocation}
+                </button>
+              </div>
+              {locationStatus === 'denied' && (
+                <p className="text-sm text-red-300">{tr.locationDenied}</p>
+              )}
+            </section>
           )}
 
           {/* Day selector */}
@@ -190,9 +362,30 @@ function DashboardApp() {
           ) : (
             <>
               {/* Summary stats */}
-              <StatsBar lakes={lakes} lang={lang} />
+              <StatsBar lakes={isInternational && internationalPreference ? filtered : lakes} lang={lang} />
 
               <section className="rounded-2xl border border-white/10 bg-white/[0.035] p-3 space-y-3">
+                {isInternational && internationalPreference && (
+                  <div className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-mud-950/45 px-3 py-3">
+                    <div className="min-w-0 text-sm">
+                      <p className="text-slate-500">{tr.currentArea}</p>
+                      <p className="truncate text-slate-200">
+                        {[internationalPreference.country, internationalPreference.region].filter(Boolean).join(' · ')}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setCountryInput(internationalPreference.country);
+                        setRegionInput(internationalPreference.region);
+                        setShowInternationalPrompt(true);
+                      }}
+                      className="shrink-0 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm font-semibold text-slate-200 transition-all hover:bg-white/[0.07] hover:text-white"
+                    >
+                      {tr.changeArea}
+                    </button>
+                  </div>
+                )}
+
                 <div className="relative">
                   <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">
                     🔎
@@ -231,8 +424,8 @@ function DashboardApp() {
                     className="w-full rounded-xl border border-white/10 bg-mud-950/70 px-3 py-3 text-sm text-white outline-none focus:border-lake-400/60"
                   >
                     <option value="all">{tr.allCounties}</option>
-                    {counties.map((county) => (
-                      <option key={county} value={county}>{county}</option>
+                    {regions.map((region) => (
+                      <option key={region} value={region}>{region}</option>
                     ))}
                   </select>
                 ) : (
@@ -289,7 +482,7 @@ function DashboardApp() {
               </div>
 
               {tab === 'map' ? (
-                <LakeMap lakes={visibleLakes} />
+                <LakeMap key={visibleLakes.map((lake) => lake.id).join('|')} lakes={visibleLakes} />
               ) : (
                 <>
                   {/* Filter chips */}
@@ -320,7 +513,7 @@ function DashboardApp() {
                       {isToday ? tr.topLakesToday : `${tr.forecastTitle} ${forecastDateLabel}`}
                     </span>
                     <span className="text-xs font-body font-normal text-slate-500">
-                      {visibleLakes.length}/{lakes.length}
+                      {visibleLakes.length}/{filtered.length}
                     </span>
                   </h2>
 
@@ -336,7 +529,7 @@ function DashboardApp() {
                             lake={lake}
                             rank={i + 1}
                             lang={lang}
-                            userLocation={userLocation}
+                            userLocation={activeLocation}
                             highlighted={isLinkedLake}
                             shareCode={shareCode}
                           />
@@ -345,7 +538,14 @@ function DashboardApp() {
                     ) : (
                       <div className="text-center py-16 text-slate-500 font-body">
                         <p className="text-4xl mb-4">🎣</p>
-                        <p className="text-lg">{tr.noLakes}</p>
+                        <p className="text-lg">
+                          {isInternational && internationalPreference ? tr.noInternationalLakes : tr.noLakes}
+                        </p>
+                        {isInternational && internationalPreference && (
+                          <a href="/suggest-lake" className="mt-3 inline-flex rounded-xl border border-lake-500/40 bg-lake-600/20 px-4 py-2 text-sm font-semibold text-white hover:bg-lake-600/35">
+                            {tr.suggestLakeLink}
+                          </a>
+                        )}
                       </div>
                     )}
                   </div>
@@ -358,7 +558,7 @@ function DashboardApp() {
               <footer className="text-center py-8 text-xs text-slate-700 font-body">
                 Baltozaur · baltozaur.ro ·{' '}
                 <a href="/suggest-lake" className="text-slate-500 hover:text-slate-300">
-                  Sugereaza o balta
+                  {tr.suggestLakeLink}
                 </a>
               </footer>
             </>
