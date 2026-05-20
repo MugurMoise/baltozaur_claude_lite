@@ -4,9 +4,10 @@ import { getScoreColor, getScoreLabel } from '../types/lake';
 
 interface Props {
   lakes: LakeScore[];
+  variant?: 'mobile' | 'desktop';
 }
 
-export function LakeMap({ lakes }: Props) {
+export function LakeMap({ lakes, variant = 'mobile' }: Props) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<import('leaflet').Map | null>(null);
 
@@ -136,7 +137,7 @@ export function LakeMap({ lakes }: Props) {
 
   return (
     <div className="relative rounded-2xl overflow-hidden border border-white/10 shadow-xl">
-      <div ref={mapRef} className="h-[380px] sm:h-[440px] w-full" />
+      <div ref={mapRef} className={variant === 'desktop' ? 'h-[calc(100vh-170px)] min-h-[560px] w-full' : 'h-[380px] sm:h-[440px] w-full'} />
       <div className="absolute bottom-3 left-3 flex gap-1.5 z-[400]">
         {[
           { color: '#22c55e', label: '70–100' },
