@@ -11,6 +11,7 @@ interface Props {
   userLocation?: { lat: number; lon: number } | null;
   highlighted?: boolean;
   shareCode?: string;
+  showQrNavigation?: boolean;
 }
 
 function distanceBetweenKm(from: { lat: number; lon: number }, to: { lat: number; lon: number }) {
@@ -43,9 +44,10 @@ function parseFeedingWindow(window: string) {
   };
 }
 
-export function LakeCard({ lake, rank, lang, userLocation, highlighted = false, shareCode }: Props) {
+export function LakeCard({ lake, rank, lang, userLocation, highlighted = false, shareCode, showQrNavigation = false }: Props) {
   const [expanded, setExpanded] = useState(highlighted);
   const [copied, setCopied] = useState(false);
+  const [showNavigationQr, setShowNavigationQr] = useState(false);
   const tr = t[lang];
   const level = getScoreLevel(lake.score);
   const scoreColor = getScoreColor(lake.score);
@@ -63,6 +65,9 @@ export function LakeCard({ lake, rank, lang, userLocation, highlighted = false, 
   const websiteLabel = lake.website_url ?? lake.facebook_url?.replace(/^https?:\/\/(www\.)?/i, '') ?? '';
   const phoneNumbers = lake.phone?.split(/[,/]/).map((phone) => phone.trim()).filter(Boolean) ?? [];
   const hasRainWarning = (lake.precipitation ?? 0) > 0 || (lake.rain_hours ?? 0) > 0;
+  const wazeUrl = `https://waze.com/ul?ll=${lake.lat},${lake.lon}&navigate=yes`;
+  const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${lake.lat},${lake.lon}`;
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=12&data=${encodeURIComponent(wazeUrl)}`;
   const shareUrl = useMemo(() => {
     const url = new URL(window.location.href);
     url.search = '';
@@ -156,14 +161,24 @@ export function LakeCard({ lake, rank, lang, userLocation, highlighted = false, 
         {/* Actions row */}
         <div className="flex items-center gap-3">
           {/* Navigate — big button */}
-          <a
-            href={`https://www.google.com/maps/dir/?api=1&destination=${lake.lat},${lake.lon}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex-1 flex items-center justify-center gap-2 bg-lake-600/30 border border-lake-500/40 hover:bg-lake-600/50 text-white rounded-2xl py-3 font-body font-semibold text-sm transition-all active:scale-95"
-          >
-            {tr.navigate}
-          </a>
+          {showQrNavigation ? (
+            <button
+              type="button"
+              onClick={() => setShowNavigationQr(true)}
+              className="flex-1 flex items-center justify-center gap-2 bg-lake-600/30 border border-lake-500/40 hover:bg-lake-600/50 text-white rounded-2xl py-3 font-body font-semibold text-sm transition-all active:scale-95"
+            >
+              {tr.navigate}
+            </button>
+          ) : (
+            <a
+              href={directionsUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-1 flex items-center justify-center gap-2 bg-lake-600/30 border border-lake-500/40 hover:bg-lake-600/50 text-white rounded-2xl py-3 font-body font-semibold text-sm transition-all active:scale-95"
+            >
+              {tr.navigate}
+            </a>
+          )}
 
           {/* Expand for tech details */}
           <button
@@ -315,6 +330,60 @@ export function LakeCard({ lake, rank, lang, userLocation, highlighted = false, 
           </div>
         )}
       </div>
+
+      {showNavigationQr && (
+        <div
+          className="fixed inset-0 z-[1000] flex items-center justify-center bg-mud-900/80 px-4 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={`waze-qr-${lake.id}`}
+          onClick={() => setShowNavigationQr(false)}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl border border-white/10 bg-mud-950 p-5 shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h3 id={`waze-qr-${lake.id}`} className="font-display text-2xl tracking-wide text-white">
+                  {tr.wazeQrTitle}
+                </h3>
+                <p className="mt-1 text-sm text-slate-400">
+                  {tr.wazeQrText}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowNavigationQr(false)}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-slate-400 transition-all hover:bg-white/[0.07] hover:text-white"
+                aria-label={tr.close}
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-white p-4">
+              <img
+                src={qrUrl}
+                alt={tr.wazeQrAlt}
+                className="mx-auto h-[220px] w-[220px]"
+              />
+            </div>
+
+            <p className="mt-3 truncate text-center text-sm font-semibold text-white">
+              {lake.name}
+            </p>
+            <a
+              href={wazeUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-4 flex w-full items-center justify-center rounded-xl border border-lake-500/40 bg-lake-600/25 px-3 py-3 text-sm font-semibold text-white transition-all hover:bg-lake-600/40"
+            >
+              {tr.openWaze}
+            </a>
+          </div>
+        </div>
+      )}
     </article>
   );
 }

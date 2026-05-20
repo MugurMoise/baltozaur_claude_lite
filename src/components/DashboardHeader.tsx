@@ -1,6 +1,9 @@
 import type { Lang } from '../i18n';
 import { getLocale, LANGUAGES, langMeta, t } from '../i18n';
 
+type ViewMode = 'auto' | 'mobile' | 'desktop';
+type EffectiveView = 'mobile' | 'desktop';
+
 interface Props {
   lastUpdated: Date | null;
   refreshing: boolean;
@@ -9,9 +12,23 @@ interface Props {
   isToday: boolean;
   lang: Lang;
   onLangChange: (lang: Lang) => void;
+  viewMode: ViewMode;
+  effectiveView: EffectiveView;
+  onViewModeChange: (mode: ViewMode) => void;
 }
 
-export function DashboardHeader({ lastUpdated, refreshing, onRefresh, lakeCount, isToday, lang, onLangChange }: Props) {
+export function DashboardHeader({
+  lastUpdated,
+  refreshing,
+  onRefresh,
+  lakeCount,
+  isToday,
+  lang,
+  onLangChange,
+  viewMode,
+  effectiveView,
+  onViewModeChange,
+}: Props) {
   const tr = t[lang];
   const locale = getLocale(lang);
   const timeStr = lastUpdated
@@ -20,14 +37,14 @@ export function DashboardHeader({ lastUpdated, refreshing, onRefresh, lakeCount,
 
   return (
     <header className="sticky top-0 z-50 backdrop-blur-xl bg-mud-900/85 border-b border-white/5">
-      <div className="max-w-2xl mx-auto px-4 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
+      <div className={`${effectiveView === 'desktop' ? 'max-w-7xl' : 'max-w-2xl'} mx-auto px-4 py-4`}>
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
             <div className="relative">
               <img
                 src="/baltozaur-mark.png"
                 alt="Baltozaur"
-                className="h-14 w-16 object-contain drop-shadow-[0_8px_18px_rgba(0,0,0,0.45)]"
+                className="h-11 w-12 object-contain drop-shadow-[0_8px_18px_rgba(0,0,0,0.45)] sm:h-14 sm:w-16"
               />
               {isToday && (
                 <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-mud-900">
@@ -35,18 +52,29 @@ export function DashboardHeader({ lastUpdated, refreshing, onRefresh, lakeCount,
                 </span>
               )}
             </div>
-            <div>
-              <h1 className="font-display text-3xl text-white tracking-wider leading-none">BALTOZAUR</h1>
-              <p className="text-xs text-slate-500 font-body mt-0.5">{tr.appSubtitle}</p>
+            <div className="min-w-0">
+              <h1 className="truncate font-display text-2xl text-white tracking-wider leading-none sm:text-3xl">BALTOZAUR</h1>
+              <p className="hidden text-xs text-slate-500 font-body mt-0.5 sm:block">{tr.appSubtitle}</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+            <select
+              value={viewMode}
+              onChange={(event) => onViewModeChange(event.target.value as ViewMode)}
+              aria-label={tr.viewMode}
+              title={tr.viewMode}
+              className="h-9 max-w-[76px] rounded-2xl bg-white/5 border border-white/10 pl-2.5 pr-6 text-xs font-body font-semibold text-slate-300 hover:text-white hover:bg-white/10 transition-all outline-none sm:h-10 sm:max-w-none sm:pl-3 sm:pr-8"
+            >
+              <option value="auto">{tr.viewAuto}</option>
+              <option value="mobile">{tr.viewMobile}</option>
+              <option value="desktop">{tr.viewDesktop}</option>
+            </select>
             <select
               value={lang}
               onChange={(event) => onLangChange(event.target.value as Lang)}
               aria-label="Language"
-              className="h-10 rounded-2xl bg-white/5 border border-white/10 pl-3 pr-8 text-xs font-body font-semibold text-slate-300 hover:text-white hover:bg-white/10 transition-all outline-none"
+              className="h-9 max-w-[70px] rounded-2xl bg-white/5 border border-white/10 pl-2.5 pr-6 text-xs font-body font-semibold text-slate-300 hover:text-white hover:bg-white/10 transition-all outline-none sm:h-10 sm:max-w-none sm:pl-3 sm:pr-8"
             >
               {LANGUAGES.map((code) => (
                 <option key={code} value={code}>
@@ -57,7 +85,7 @@ export function DashboardHeader({ lastUpdated, refreshing, onRefresh, lakeCount,
             <button
               onClick={onRefresh}
               disabled={refreshing}
-              className="w-10 h-10 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition-all disabled:opacity-40"
+              className="h-9 w-9 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition-all disabled:opacity-40 sm:h-10 sm:w-10"
               title={tr.refreshTitle}
             >
               <svg className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
