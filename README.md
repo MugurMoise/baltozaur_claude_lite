@@ -32,7 +32,7 @@ The app reads from `latest_lake_scores` view/table with these columns:
 | id | uuid/text | Primary key |
 | name | text | Lake name |
 | county | text | Romanian county |
-| distance_km | float | Distance from Bucharest |
+| distance_km | float/null | Optional distance from Bucharest, used only for Romanian/local lakes |
 | lat / lon | float | Coordinates |
 | score | float | 0–100 fishing score |
 | temperature | float | Water/air temp °C |
