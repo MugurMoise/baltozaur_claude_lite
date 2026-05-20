@@ -491,6 +491,7 @@ function DashboardApp() {
                 userLocation={activeLocation}
                 highlighted={isLinkedLake}
                 shareCode={shareCode}
+                showQrNavigation={isDesktopView}
               />
             );
           })
