@@ -83,7 +83,7 @@ const RAINY_WIND_SPEED_KMH = 20;
 
 function getRainPenalty(rainMinutes: number, rainyWindMinutes: number, precipitation: number): number {
   if (precipitation < MIN_PRECIPITATION_MM_FOR_PENALTY) return 0;
-  if (rainyWindMinutes >= MIN_RAIN_MINUTES_FOR_PENALTY) return 50;
+  if (rainyWindMinutes >= MIN_RAIN_MINUTES_FOR_PENALTY && precipitation >= HEAVY_PRECIPITATION_MM) return 50;
   if (rainMinutes > 120 && precipitation >= HEAVY_PRECIPITATION_MM) return 35;
   if (rainMinutes >= 60) return 12;
   return 0;

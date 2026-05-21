@@ -195,7 +195,7 @@ serve(async (req) => {
     else if (weather.temperatureDelta < -3) score -= 8;
 
     if (weather.precipitation >= MIN_PRECIPITATION_MM_FOR_PENALTY) {
-      if (weather.rainyWindMinutes >= MIN_RAIN_MINUTES_FOR_PENALTY) score -= 50;
+      if (weather.rainyWindMinutes >= MIN_RAIN_MINUTES_FOR_PENALTY && weather.precipitation >= HEAVY_PRECIPITATION_MM) score -= 50;
       else if (weather.rainMinutes > 120 && weather.precipitation >= HEAVY_PRECIPITATION_MM) score -= 35;
       else if (weather.rainMinutes >= 60) score -= 12;
     }
