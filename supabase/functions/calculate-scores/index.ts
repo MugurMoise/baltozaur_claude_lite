@@ -33,6 +33,8 @@ serve(async (req) => {
   };
   const RAIN_INTERVAL_MM = 0.1;
   const MIN_RAIN_MINUTES_FOR_PENALTY = 30;
+  const MIN_PRECIPITATION_MM_FOR_PENALTY = 1;
+  const HEAVY_PRECIPITATION_MM = 3;
   const MINUTELY_INTERVAL_MINUTES = 15;
   const RAINY_WIND_SPEED_KMH = 20;
 
@@ -192,9 +194,11 @@ serve(async (req) => {
     if (weather.temperatureDelta > 0.5 && weather.temperatureDelta <= 4) score += 6;
     else if (weather.temperatureDelta < -3) score -= 8;
 
-    if (weather.rainyWindMinutes >= MIN_RAIN_MINUTES_FOR_PENALTY) score -= 70;
-    else if (weather.rainMinutes > 120) score -= 50;
-    else if (weather.rainMinutes >= MIN_RAIN_MINUTES_FOR_PENALTY || weather.precipitation > 0) score -= 16;
+    if (weather.precipitation >= MIN_PRECIPITATION_MM_FOR_PENALTY) {
+      if (weather.rainyWindMinutes >= MIN_RAIN_MINUTES_FOR_PENALTY) score -= 50;
+      else if (weather.rainMinutes > 120 && weather.precipitation >= HEAVY_PRECIPITATION_MM) score -= 35;
+      else if (weather.rainMinutes >= 60) score -= 12;
+    }
 
     return Math.max(0, Math.min(Math.round(score), 100));
   }

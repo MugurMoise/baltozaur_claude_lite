@@ -76,13 +76,16 @@ function expandFeedingSlots(windows: string[]): string[] | null {
 
 const RAIN_INTERVAL_MM = 0.1;
 const MIN_RAIN_MINUTES_FOR_PENALTY = 30;
+const MIN_PRECIPITATION_MM_FOR_PENALTY = 1;
+const HEAVY_PRECIPITATION_MM = 3;
 const MINUTELY_INTERVAL_MINUTES = 15;
 const RAINY_WIND_SPEED_KMH = 20;
 
 function getRainPenalty(rainMinutes: number, rainyWindMinutes: number, precipitation: number): number {
-  if (rainyWindMinutes >= MIN_RAIN_MINUTES_FOR_PENALTY) return 70;
-  if (rainMinutes > 120) return 50;
-  if (rainMinutes >= MIN_RAIN_MINUTES_FOR_PENALTY || precipitation > 0) return 16;
+  if (precipitation < MIN_PRECIPITATION_MM_FOR_PENALTY) return 0;
+  if (rainyWindMinutes >= MIN_RAIN_MINUTES_FOR_PENALTY) return 50;
+  if (rainMinutes > 120 && precipitation >= HEAVY_PRECIPITATION_MM) return 35;
+  if (rainMinutes >= 60) return 12;
   return 0;
 }
 
