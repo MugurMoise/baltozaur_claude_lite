@@ -74,10 +74,15 @@ function expandFeedingSlots(windows: string[]): string[] | null {
   });
 }
 
-function getRainPenalty(rainHours: number, rainyWindHours: number, precipitation: number): number {
-  if (rainyWindHours > 0) return 70;
-  if (rainHours > 2) return 50;
-  if (precipitation > 0) return 16;
+const RAIN_INTERVAL_MM = 0.1;
+const MIN_RAIN_MINUTES_FOR_PENALTY = 30;
+const MINUTELY_INTERVAL_MINUTES = 15;
+const RAINY_WIND_SPEED_KMH = 20;
+
+function getRainPenalty(rainMinutes: number, rainyWindMinutes: number, precipitation: number): number {
+  if (rainyWindMinutes >= MIN_RAIN_MINUTES_FOR_PENALTY) return 70;
+  if (rainMinutes > 120) return 50;
+  if (rainMinutes >= MIN_RAIN_MINUTES_FOR_PENALTY || precipitation > 0) return 16;
   return 0;
 }
 
@@ -90,6 +95,7 @@ async function fetchLiveRainForLake(lake: LakeScore, day: string) {
   url.searchParams.set('timezone', 'Europe/Bucharest');
   url.searchParams.set('forecast_days', '7');
   url.searchParams.set('hourly', 'precipitation,rain,showers,wind_speed_10m');
+  url.searchParams.set('minutely_15', 'precipitation,wind_speed_10m');
   url.searchParams.set('daily', 'precipitation_sum,rain_sum,showers_sum');
 
   try {
@@ -103,19 +109,48 @@ async function fetchLiveRainForLake(lake: LakeScore, day: string) {
     const hourlyTimes: string[] = data.hourly?.time ?? [];
     const hourlyPrecip: number[] = data.hourly?.precipitation ?? [];
     const hourlyWind: number[] = data.hourly?.wind_speed_10m ?? [];
+    const minutelyTimes: string[] = data.minutely_15?.time ?? [];
+    const minutelyPrecip: number[] = data.minutely_15?.precipitation ?? [];
+    const minutelyWind: number[] = data.minutely_15?.wind_speed_10m ?? [];
+    const dayMinuteIndexes = minutelyTimes
+      .map((time, index) => ({ time, index }))
+      .filter(({ time }) => time.startsWith(day))
+      .map(({ index }) => index);
     const dayHourIndexes = hourlyTimes
       .map((time, index) => ({ time, index }))
       .filter(({ time }) => time.startsWith(day))
       .map(({ index }) => index);
 
-    const rainHours = dayHourIndexes.filter((index) => (hourlyPrecip[index] ?? 0) >= 0.1).length;
-    const rainyWindHours = dayHourIndexes.filter((index) => (
-      (hourlyPrecip[index] ?? 0) >= 0.1 && (hourlyWind[index] ?? 0) >= 20
-    )).length;
+    if (dayMinuteIndexes.length > 0) {
+      const rainyMinuteIndexes = dayMinuteIndexes.filter((index) => (minutelyPrecip[index] ?? 0) >= RAIN_INTERVAL_MM);
+      const rainMinutes = rainyMinuteIndexes.length * MINUTELY_INTERVAL_MINUTES;
+
+      if (rainMinutes < MIN_RAIN_MINUTES_FOR_PENALTY) {
+        return { precipitation: 0, rainHours: 0, rainMinutes: 0, rainyWindMinutes: 0 };
+      }
+
+      const precipitation = dayMinuteIndexes.reduce((sum, index) => sum + (minutelyPrecip[index] ?? 0), 0);
+      const rainyWindMinutes = rainyMinuteIndexes.filter((index) => (
+        (minutelyWind[index] ?? 0) >= RAINY_WIND_SPEED_KMH
+      )).length * MINUTELY_INTERVAL_MINUTES;
+
+      return { precipitation, rainHours: rainMinutes / 60, rainMinutes, rainyWindMinutes };
+    }
+
+    const rainHours = dayHourIndexes.filter((index) => (hourlyPrecip[index] ?? 0) >= RAIN_INTERVAL_MM).length;
+    const rainMinutes = rainHours * 60;
+    const rainyWindMinutes = dayHourIndexes.filter((index) => (
+      (hourlyPrecip[index] ?? 0) >= RAIN_INTERVAL_MM && (hourlyWind[index] ?? 0) >= RAINY_WIND_SPEED_KMH
+    )).length * 60;
+
+    if (rainMinutes < MIN_RAIN_MINUTES_FOR_PENALTY) {
+      return { precipitation: 0, rainHours: 0, rainMinutes: 0, rainyWindMinutes: 0 };
+    }
+
     const precipitation = data.daily?.precipitation_sum?.[dayIndex]
       ?? dayHourIndexes.reduce((sum, index) => sum + (hourlyPrecip[index] ?? 0), 0);
 
-    return { precipitation, rainHours, rainyWindHours };
+    return { precipitation, rainHours, rainMinutes, rainyWindMinutes };
   } catch (error) {
     console.warn('[Baltozaur] live rain fetch failed:', lake.name, error);
     return null;
@@ -131,7 +166,7 @@ async function enrichWithLiveRain(lakes: LakeScore[], day: string): Promise<Lake
     const previousRainHours = lake.rain_hours ?? 0;
     const shouldApplyPenalty = previousPrecipitation === 0 && previousRainHours === 0;
     const penalty = shouldApplyPenalty
-      ? getRainPenalty(liveRain.rainHours, liveRain.rainyWindHours, liveRain.precipitation)
+      ? getRainPenalty(liveRain.rainMinutes, liveRain.rainyWindMinutes, liveRain.precipitation)
       : 0;
 
     return {

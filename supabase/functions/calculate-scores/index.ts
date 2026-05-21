@@ -31,6 +31,10 @@ serve(async (req) => {
     lakes: `${tablePrefix}lakes`,
     lakeScores: `${tablePrefix}lake_scores`,
   };
+  const RAIN_INTERVAL_MM = 0.1;
+  const MIN_RAIN_MINUTES_FOR_PENALTY = 30;
+  const MINUTELY_INTERVAL_MINUTES = 15;
+  const RAINY_WIND_SPEED_KMH = 20;
 
   function errorMessage(err: unknown) {
     if (err instanceof Error) return err.message;
@@ -155,8 +159,8 @@ serve(async (req) => {
     temperatureDelta: number;
     cloud_cover: number;
     precipitation: number;
-    rainHours: number;
-    rainyWindHours: number;
+    rainMinutes: number;
+    rainyWindMinutes: number;
   }) {
     let score = 55;
 
@@ -188,11 +192,67 @@ serve(async (req) => {
     if (weather.temperatureDelta > 0.5 && weather.temperatureDelta <= 4) score += 6;
     else if (weather.temperatureDelta < -3) score -= 8;
 
-    if (weather.rainyWindHours > 0) score -= 70;
-    else if (weather.rainHours > 2) score -= 50;
-    else if (weather.precipitation > 0) score -= 16;
+    if (weather.rainyWindMinutes >= MIN_RAIN_MINUTES_FOR_PENALTY) score -= 70;
+    else if (weather.rainMinutes > 120) score -= 50;
+    else if (weather.rainMinutes >= MIN_RAIN_MINUTES_FOR_PENALTY || weather.precipitation > 0) score -= 16;
 
     return Math.max(0, Math.min(Math.round(score), 100));
+  }
+
+  function getRainMetricsForDay(args: {
+    dateStr: string;
+    minutely?: { time?: string[]; precipitation?: number[]; wind_speed_10m?: number[] };
+    hourlyPrecip: number[];
+    hourlyWind: number[];
+    dailyPrecipitation?: number;
+    currentPrecipitation?: number;
+  }) {
+    const minutelyTimes = args.minutely?.time ?? [];
+    const minutelyPrecip = args.minutely?.precipitation ?? [];
+    const minutelyWind = args.minutely?.wind_speed_10m ?? [];
+    const minuteIndexes = minutelyTimes
+      .map((time, index) => ({ time, index }))
+      .filter(({ time }) => time.startsWith(args.dateStr))
+      .map(({ index }) => index);
+
+    if (minuteIndexes.length > 0) {
+      const rainyIndexes = minuteIndexes.filter((index) => (minutelyPrecip[index] ?? 0) >= RAIN_INTERVAL_MM);
+      const rainMinutes = rainyIndexes.length * MINUTELY_INTERVAL_MINUTES;
+      const isEffectiveRain = rainMinutes >= MIN_RAIN_MINUTES_FOR_PENALTY;
+
+      if (!isEffectiveRain) {
+        return { precipitation: 0, rainHours: 0, rainMinutes: 0, rainyWindMinutes: 0 };
+      }
+
+      const precipitation = minuteIndexes.reduce((sum, index) => sum + (minutelyPrecip[index] ?? 0), 0);
+      const rainyWindMinutes = rainyIndexes.filter((index) => (
+        (minutelyWind[index] ?? 0) >= RAINY_WIND_SPEED_KMH
+      )).length * MINUTELY_INTERVAL_MINUTES;
+
+      return {
+        precipitation,
+        rainHours: rainMinutes / 60,
+        rainMinutes,
+        rainyWindMinutes,
+      };
+    }
+
+    const rainHours = args.hourlyPrecip.filter((value: number) => value >= RAIN_INTERVAL_MM).length;
+    const rainMinutes = rainHours * 60;
+    const rainyWindMinutes = args.hourlyPrecip.filter((value: number, index: number) => (
+      value >= RAIN_INTERVAL_MM && (args.hourlyWind[index] ?? 0) >= RAINY_WIND_SPEED_KMH
+    )).length * 60;
+
+    if (rainMinutes < MIN_RAIN_MINUTES_FOR_PENALTY) {
+      return { precipitation: 0, rainHours: 0, rainMinutes: 0, rainyWindMinutes: 0 };
+    }
+
+    return {
+      precipitation: args.dailyPrecipitation ?? args.currentPrecipitation ?? 0,
+      rainHours,
+      rainMinutes,
+      rainyWindMinutes,
+    };
   }
 
   function getFeedingSlots(args: {
@@ -263,6 +323,7 @@ serve(async (req) => {
         `&forecast_days=7` +
         `&current=temperature_2m,pressure_msl,windspeed_10m,cloud_cover,precipitation` +
         `&hourly=temperature_2m,pressure_msl,precipitation,windspeed_10m` +
+        `&minutely_15=precipitation,wind_speed_10m` +
         `&daily=sunrise,sunset,windspeed_10m_max,precipitation_sum,cloudcover_mean,temperature_2m_max,temperature_2m_min`;
 
       const res  = await fetch(url);
@@ -271,6 +332,7 @@ serve(async (req) => {
       const current = json.current;
       const daily   = json.daily;
       const hourly  = json.hourly;
+      const minutely = json.minutely_15;
 
       if (!res.ok || !current || !daily?.time?.length || !hourly?.time?.length) {
         throw new Error(`Open-Meteo failed: ${json.reason ?? res.statusText}`);
@@ -311,14 +373,17 @@ serve(async (req) => {
         const dayEndIdx = dayStartIdx + 24;
         const hourlyPrecip = (hourly.precipitation ?? []).slice(dayStartIdx, dayEndIdx);
         const hourlyWind = (hourly.windspeed_10m ?? []).slice(dayStartIdx, dayEndIdx);
-        const rainHours = hourlyPrecip.filter((value: number) => value >= 0.1).length;
-        const rainyWindHours = hourlyPrecip.filter((value: number, index: number) => (
-          value >= 0.1 && (hourlyWind[index] ?? 0) >= 20
-        )).length;
+        const rainMetrics = getRainMetricsForDay({
+          dateStr,
+          minutely,
+          hourlyPrecip,
+          hourlyWind,
+          dailyPrecipitation: daily.precipitation_sum[d],
+          currentPrecipitation: current.precipitation,
+        });
 
         const windSpeed  = d === 0 ? current.windspeed_10m : daily.windspeed_10m_max[d];
         const cloudCover = d === 0 ? current.cloud_cover   : daily.cloudcover_mean[d];
-        const precip     = daily.precipitation_sum[d] ?? current.precipitation ?? 0;
 
         let pressureDelta: number;
         let tempDelta: number;
@@ -339,9 +404,9 @@ serve(async (req) => {
           temperature:      temp,
           temperatureDelta: tempDelta,
           cloud_cover:      cloudCover,
-          precipitation:    precip,
-          rainHours,
-          rainyWindHours,
+          precipitation:    rainMetrics.precipitation,
+          rainMinutes:      rainMetrics.rainMinutes,
+          rainyWindMinutes: rainMetrics.rainyWindMinutes,
         });
 
         const feedingWindows = getFeedingSlots({
@@ -360,8 +425,8 @@ serve(async (req) => {
           wind_speed:        windSpeed,
           temperature:       temp,
           temperature_delta: tempDelta,
-          precipitation:     precip,
-          rain_hours:        rainHours,
+          precipitation:     Number(rainMetrics.precipitation.toFixed(1)),
+          rain_hours:        rainMetrics.rainHours,
           feeding_windows:   feedingWindows,
           calculated_at:     calculatedAt,
         };
