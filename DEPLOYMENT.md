@@ -101,6 +101,12 @@ For production, call the function without the query parameter:
 
 This keeps the production cron path unchanged while letting manual/dev runs write to `dev_*` tables.
 
+## Scheduled Score Refresh
+
+The database migration `20260521171021_schedule_calculate_scores_cron.sql` registers a Supabase cron job named `calculate-scores-every-3-hours`.
+
+It calls the production `calculate-scores` Edge Function at minute 0 every 3 hours. A production run refreshes weather-backed scores for today and the next 6 forecast days, then mirrors those rows into `dev_*` score tables.
+
 ## Release Flow
 
 1. Work on `dev`.
