@@ -7,6 +7,7 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
 const appEnv = (import.meta.env.VITE_APP_ENV as string | undefined) ?? 'prod';
 const tablePrefix = appEnv === 'dev' ? 'dev_' : '';
+const FORECAST_DAY_COUNT = 7;
 
 export const isDevEnvironment = appEnv === 'dev';
 export const tables = {
@@ -232,11 +233,15 @@ async function enrichWithProdLakeDetails(lakes: LakeScore[]): Promise<LakeScore[
 }
 
 // ── Sample fallback data using real lake names ───────────────────────────────
-const SAMPLE_DAYS = [0, 1, 2, 3, 4].map((offset) => {
-  const d = new Date();
-  d.setDate(d.getDate() + offset);
-  return getLocalDateKey(d);
-});
+function buildForecastDays(count = FORECAST_DAY_COUNT): string[] {
+  return Array.from({ length: count }, (_, offset) => {
+    const d = new Date();
+    d.setDate(d.getDate() + offset);
+    return getLocalDateKey(d);
+  });
+}
+
+const SAMPLE_DAYS = buildForecastDays();
 
 const sampleContact = {
   country: 'RO',
@@ -270,6 +275,8 @@ export async function fetchAvailableDays(): Promise<string[]> {
     return SAMPLE_DAYS;
   }
 
+  const forecastDays = buildForecastDays();
+
   // Get distinct calendar days from calculated_at
   const { data, error } = await supabase
     .from(tables.lakeScores)
@@ -289,13 +296,14 @@ export async function fetchAvailableDays(): Promise<string[]> {
   }
 
   const today = getLocalDateKey();
-  seen.add(today);
+  // Supabase responses may be capped before all forecast dates are represented.
+  forecastDays.forEach((day) => seen.add(day));
 
   const days = Array.from(seen)
     .filter((day) => day >= today)
     .sort();
 
-  return days.length > 0 ? days : SAMPLE_DAYS;
+  return days.length > 0 ? days : forecastDays;
 }
 
 // ── Fetch lake scores for a specific day, joined with lake metadata ──────────
