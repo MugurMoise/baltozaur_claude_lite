@@ -5,7 +5,7 @@ import { getLocalDateKey } from './date';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
-const appEnv = (import.meta.env.VITE_APP_ENV as string | undefined) ?? 'prod';
+export const appEnv = (import.meta.env.VITE_APP_ENV as string | undefined) ?? 'prod';
 const tablePrefix = appEnv === 'dev' ? 'dev_' : '';
 const FORECAST_DAY_COUNT = 7;
 
@@ -401,6 +401,9 @@ export async function fetchLakeScoresForDay(day: string): Promise<LakeScore[]> {
   }
 
   if (!data || data.length === 0) {
+    if (import.meta.env.DEV) {
+      return SAMPLE_LAKES.filter((l) => l.calculated_at.startsWith(day));
+    }
     return [];
   }
 
