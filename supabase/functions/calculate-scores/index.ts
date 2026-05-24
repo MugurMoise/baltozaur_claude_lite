@@ -396,7 +396,9 @@ serve(async (req) => {
         });
         const effectiveHourlyPrecip = rainMetrics.precipitation > 0 ? hourlyPrecip : hourlyPrecip.map(() => 0);
 
-        const windSpeed  = d === 0 ? current.windspeed_10m : daily.windspeed_10m_max[d];
+        const windSpeed  = d === 0
+          ? Math.max(current.windspeed_10m ?? 0, daily.windspeed_10m_max[d] ?? 0)
+          : daily.windspeed_10m_max[d];
         const cloudCover = d === 0 ? current.cloud_cover   : daily.cloudcover_mean[d];
 
         let pressureDelta: number;
