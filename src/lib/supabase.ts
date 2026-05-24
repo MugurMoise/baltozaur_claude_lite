@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import type { LakeScore } from '../types/lake';
+import { MIN_DISPLAY_PRECIPITATION_MM, type LakeScore } from '../types/lake';
 import type { SocialLakeOption, SocialPostAnalysis, SocialPostInput, SocialPostWithAnalysis } from '../types/social';
 import { getLocalDateKey } from './date';
 
@@ -76,9 +76,10 @@ function expandFeedingSlots(windows: string[]): string[] | null {
 }
 
 function getRainPenalty(rainHours: number, rainyWindHours: number, precipitation: number): number {
+  if (precipitation < MIN_DISPLAY_PRECIPITATION_MM) return 0;
   if (rainyWindHours > 0) return 70;
   if (rainHours > 2) return 50;
-  if (precipitation > 0) return 16;
+  if (precipitation >= MIN_DISPLAY_PRECIPITATION_MM) return 16;
   return 0;
 }
 
@@ -115,8 +116,13 @@ async function fetchLiveRainForLake(lake: LakeScore, day: string) {
     )).length;
     const precipitation = data.daily?.precipitation_sum?.[dayIndex]
       ?? dayHourIndexes.reduce((sum, index) => sum + (hourlyPrecip[index] ?? 0), 0);
+    const effectivePrecipitation = precipitation >= MIN_DISPLAY_PRECIPITATION_MM ? precipitation : 0;
 
-    return { precipitation, rainHours, rainyWindHours };
+    return {
+      precipitation: effectivePrecipitation,
+      rainHours: effectivePrecipitation > 0 ? rainHours : 0,
+      rainyWindHours: effectivePrecipitation > 0 ? rainyWindHours : 0,
+    };
   } catch (error) {
     console.warn('[Baltozaur] live rain fetch failed:', lake.name, error);
     return null;

@@ -31,6 +31,10 @@ serve(async (req) => {
     lakes: `${tablePrefix}lakes`,
     lakeScores: `${tablePrefix}lake_scores`,
   };
+  const MIN_DISPLAY_PRECIPITATION_MM = 1;
+  const STRONG_WIND_KMH = 14;
+  const HARD_WIND_KMH = 18;
+  const VERY_HARD_WIND_KMH = 25;
 
   function errorMessage(err: unknown) {
     if (err instanceof Error) return err.message;
@@ -177,10 +181,11 @@ serve(async (req) => {
     else if (weather.pressureDelta >= 1.5 && weather.pressureDelta < 4) score -= 8;
     else if (weather.pressureDelta >= 4) score -= 18;
 
-    if (weather.wind_speed >= 4 && weather.wind_speed <= 18) score += 12;
-    else if (weather.wind_speed > 18 && weather.wind_speed <= 25) score += 5;
+    if (weather.wind_speed >= 4 && weather.wind_speed <= STRONG_WIND_KMH) score += 12;
+    else if (weather.wind_speed > STRONG_WIND_KMH && weather.wind_speed <= HARD_WIND_KMH) score += 2;
+    else if (weather.wind_speed > HARD_WIND_KMH && weather.wind_speed <= VERY_HARD_WIND_KMH) score -= 8;
     else if (weather.wind_speed < 4) score += 2;
-    else if (weather.wind_speed > 30) score -= 18;
+    else if (weather.wind_speed > VERY_HARD_WIND_KMH) score -= 18;
 
     if (weather.cloud_cover >= 30 && weather.cloud_cover <= 90) score += 8;
     else if (weather.cloud_cover < 15) score -= 5;
@@ -188,9 +193,11 @@ serve(async (req) => {
     if (weather.temperatureDelta > 0.5 && weather.temperatureDelta <= 4) score += 6;
     else if (weather.temperatureDelta < -3) score -= 8;
 
-    if (weather.rainyWindHours > 0) score -= 70;
-    else if (weather.rainHours > 2) score -= 50;
-    else if (weather.precipitation > 0) score -= 16;
+    if (weather.precipitation >= MIN_DISPLAY_PRECIPITATION_MM) {
+      if (weather.rainyWindHours > 0) score -= 70;
+      else if (weather.rainHours > 2) score -= 50;
+      else score -= 16;
+    }
 
     return Math.max(0, Math.min(Math.round(score), 100));
   }
@@ -222,8 +229,9 @@ serve(async (req) => {
       if (slot.start >= 8 && slot.end <= 16) score -= 10;
       if (rainHours > 2) score -= 45;
       else if (rainHours > 0) score -= 18;
-      if (maxWind >= 25) score -= 28;
-      else if (maxWind >= 18) score -= 12;
+      if (maxWind >= VERY_HARD_WIND_KMH) score -= 28;
+      else if (maxWind >= HARD_WIND_KMH) score -= 18;
+      else if (maxWind > STRONG_WIND_KMH) score -= 8;
 
       const label = score >= 70 ? "excelent" : score >= 50 ? "bun" : score >= 30 ? "slab" : "evita";
       const start = String(slot.start).padStart(2, "0");
@@ -319,6 +327,10 @@ serve(async (req) => {
         const windSpeed  = d === 0 ? current.windspeed_10m : daily.windspeed_10m_max[d];
         const cloudCover = d === 0 ? current.cloud_cover   : daily.cloudcover_mean[d];
         const precip     = daily.precipitation_sum[d] ?? current.precipitation ?? 0;
+        const effectivePrecip = precip >= MIN_DISPLAY_PRECIPITATION_MM ? precip : 0;
+        const effectiveRainHours = effectivePrecip > 0 ? rainHours : 0;
+        const effectiveRainyWindHours = effectivePrecip > 0 ? rainyWindHours : 0;
+        const effectiveHourlyPrecip = effectivePrecip > 0 ? hourlyPrecip : hourlyPrecip.map(() => 0);
 
         let pressureDelta: number;
         let tempDelta: number;
@@ -339,15 +351,15 @@ serve(async (req) => {
           temperature:      temp,
           temperatureDelta: tempDelta,
           cloud_cover:      cloudCover,
-          precipitation:    precip,
-          rainHours,
-          rainyWindHours,
+          precipitation:    effectivePrecip,
+          rainHours:        effectiveRainHours,
+          rainyWindHours:   effectiveRainyWindHours,
         });
 
         const feedingWindows = getFeedingSlots({
           sunrise: daily.sunrise[d],
           sunset: daily.sunset[d],
-          hourlyPrecip,
+          hourlyPrecip: effectiveHourlyPrecip,
           hourlyWind,
         });
         const calculatedAt   = `${dateStr}T12:00:00.000Z`;
@@ -360,8 +372,8 @@ serve(async (req) => {
           wind_speed:        windSpeed,
           temperature:       temp,
           temperature_delta: tempDelta,
-          precipitation:     precip,
-          rain_hours:        rainHours,
+          precipitation:     effectivePrecip,
+          rain_hours:        effectiveRainHours,
           feeding_windows:   feedingWindows,
           calculated_at:     calculatedAt,
         };
