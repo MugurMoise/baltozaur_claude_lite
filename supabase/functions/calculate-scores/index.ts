@@ -324,7 +324,9 @@ serve(async (req) => {
           value >= 0.1 && (hourlyWind[index] ?? 0) >= 20
         )).length;
 
-        const windSpeed  = d === 0 ? current.windspeed_10m : daily.windspeed_10m_max[d];
+        const windSpeed  = d === 0
+          ? Math.max(current.windspeed_10m ?? 0, daily.windspeed_10m_max[d] ?? 0)
+          : daily.windspeed_10m_max[d];
         const cloudCover = d === 0 ? current.cloud_cover   : daily.cloudcover_mean[d];
         const precip     = daily.precipitation_sum[d] ?? current.precipitation ?? 0;
         const effectivePrecip = precip >= MIN_DISPLAY_PRECIPITATION_MM ? precip : 0;
