@@ -2,6 +2,9 @@ import type { Lang } from '../i18n';
 import { getLocale, t } from '../i18n';
 import { getLocalDateKey } from '../lib/date';
 
+export const MIN_DISPLAY_PRECIPITATION_MM = 1;
+export const STRONG_WIND_KMH = 14;
+
 export interface LakeScore {
   id: string;
   lake_id: string;
@@ -70,13 +73,14 @@ export function getRecommendation(score: number, lang: Lang): string {
 export function getConditionTags(lake: LakeScore, lang: Lang): string[] {
   const tr = t[lang].conditions;
   const tags: string[] = [];
-  if ((lake.rain_hours ?? 0) > 2 && lake.wind_speed >= 20) tags.push(tr.rainWindBad);
-  else if ((lake.rain_hours ?? 0) > 2) tags.push(tr.rainBad);
-  else if ((lake.precipitation ?? 0) > 0) tags.push(tr.rainLight);
+  const hasMeaningfulRain = (lake.precipitation ?? 0) >= MIN_DISPLAY_PRECIPITATION_MM;
+  if (hasMeaningfulRain && (lake.rain_hours ?? 0) > 2 && lake.wind_speed >= 20) tags.push(tr.rainWindBad);
+  else if (hasMeaningfulRain && (lake.rain_hours ?? 0) > 2) tags.push(tr.rainBad);
+  else if (hasMeaningfulRain) tags.push(tr.rainLight);
   if (lake.temperature >= 16 && lake.temperature <= 24) tags.push(tr.tempGood);
   else tags.push(tr.tempBad);
-  if (lake.wind_speed >= 8 && lake.wind_speed <= 20) tags.push(tr.windGood);
-  else if (lake.wind_speed > 20) tags.push(tr.windBad);
+  if (lake.wind_speed >= 8 && lake.wind_speed <= STRONG_WIND_KMH) tags.push(tr.windGood);
+  else if (lake.wind_speed > STRONG_WIND_KMH) tags.push(tr.windBad);
   else tags.push(tr.windCalm);
   if ((lake.pressure_delta ?? 0) < -0.5) tags.push(tr.pressureGood);
   else tags.push(tr.pressureBad);

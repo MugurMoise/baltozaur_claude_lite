@@ -137,8 +137,14 @@ async function fetchLiveRainForLake(lake: LakeScore, day: string) {
       const rainyWindMinutes = rainyMinuteIndexes.filter((index) => (
         (minutelyWind[index] ?? 0) >= RAINY_WIND_SPEED_KMH
       )).length * MINUTELY_INTERVAL_MINUTES;
+      const effectivePrecipitation = precipitation >= MIN_PRECIPITATION_MM_FOR_PENALTY ? precipitation : 0;
 
-      return { precipitation, rainHours: rainMinutes / 60, rainMinutes, rainyWindMinutes };
+      return {
+        precipitation: effectivePrecipitation,
+        rainHours: effectivePrecipitation > 0 ? rainMinutes / 60 : 0,
+        rainMinutes: effectivePrecipitation > 0 ? rainMinutes : 0,
+        rainyWindMinutes: effectivePrecipitation > 0 ? rainyWindMinutes : 0,
+      };
     }
 
     const rainHours = dayHourIndexes.filter((index) => (hourlyPrecip[index] ?? 0) >= RAIN_INTERVAL_MM).length;
@@ -153,8 +159,14 @@ async function fetchLiveRainForLake(lake: LakeScore, day: string) {
 
     const precipitation = data.daily?.precipitation_sum?.[dayIndex]
       ?? dayHourIndexes.reduce((sum, index) => sum + (hourlyPrecip[index] ?? 0), 0);
+    const effectivePrecipitation = precipitation >= MIN_PRECIPITATION_MM_FOR_PENALTY ? precipitation : 0;
 
-    return { precipitation, rainHours, rainMinutes, rainyWindMinutes };
+    return {
+      precipitation: effectivePrecipitation,
+      rainHours: effectivePrecipitation > 0 ? rainHours : 0,
+      rainMinutes: effectivePrecipitation > 0 ? rainMinutes : 0,
+      rainyWindMinutes: effectivePrecipitation > 0 ? rainyWindMinutes : 0,
+    };
   } catch (error) {
     console.warn('[Baltozaur] live rain fetch failed:', lake.name, error);
     return null;

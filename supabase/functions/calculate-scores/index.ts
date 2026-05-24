@@ -37,6 +37,9 @@ serve(async (req) => {
   const HEAVY_PRECIPITATION_MM = 3;
   const MINUTELY_INTERVAL_MINUTES = 15;
   const RAINY_WIND_SPEED_KMH = 20;
+  const STRONG_WIND_KMH = 14;
+  const HARD_WIND_KMH = 18;
+  const VERY_HARD_WIND_KMH = 25;
 
   function errorMessage(err: unknown) {
     if (err instanceof Error) return err.message;
@@ -183,10 +186,11 @@ serve(async (req) => {
     else if (weather.pressureDelta >= 1.5 && weather.pressureDelta < 4) score -= 8;
     else if (weather.pressureDelta >= 4) score -= 18;
 
-    if (weather.wind_speed >= 4 && weather.wind_speed <= 18) score += 12;
-    else if (weather.wind_speed > 18 && weather.wind_speed <= 25) score += 5;
+    if (weather.wind_speed >= 4 && weather.wind_speed <= STRONG_WIND_KMH) score += 12;
+    else if (weather.wind_speed > STRONG_WIND_KMH && weather.wind_speed <= HARD_WIND_KMH) score += 2;
+    else if (weather.wind_speed > HARD_WIND_KMH && weather.wind_speed <= VERY_HARD_WIND_KMH) score -= 8;
     else if (weather.wind_speed < 4) score += 2;
-    else if (weather.wind_speed > 30) score -= 18;
+    else if (weather.wind_speed > VERY_HARD_WIND_KMH) score -= 18;
 
     if (weather.cloud_cover >= 30 && weather.cloud_cover <= 90) score += 8;
     else if (weather.cloud_cover < 15) score -= 5;
@@ -232,12 +236,13 @@ serve(async (req) => {
       const rainyWindMinutes = rainyIndexes.filter((index) => (
         (minutelyWind[index] ?? 0) >= RAINY_WIND_SPEED_KMH
       )).length * MINUTELY_INTERVAL_MINUTES;
+      const effectivePrecipitation = precipitation >= MIN_PRECIPITATION_MM_FOR_PENALTY ? precipitation : 0;
 
       return {
-        precipitation,
-        rainHours: rainMinutes / 60,
-        rainMinutes,
-        rainyWindMinutes,
+        precipitation: effectivePrecipitation,
+        rainHours: effectivePrecipitation > 0 ? rainMinutes / 60 : 0,
+        rainMinutes: effectivePrecipitation > 0 ? rainMinutes : 0,
+        rainyWindMinutes: effectivePrecipitation > 0 ? rainyWindMinutes : 0,
       };
     }
 
@@ -251,11 +256,14 @@ serve(async (req) => {
       return { precipitation: 0, rainHours: 0, rainMinutes: 0, rainyWindMinutes: 0 };
     }
 
+    const precipitation = args.dailyPrecipitation ?? args.currentPrecipitation ?? 0;
+    const effectivePrecipitation = precipitation >= MIN_PRECIPITATION_MM_FOR_PENALTY ? precipitation : 0;
+
     return {
-      precipitation: args.dailyPrecipitation ?? args.currentPrecipitation ?? 0,
-      rainHours,
-      rainMinutes,
-      rainyWindMinutes,
+      precipitation: effectivePrecipitation,
+      rainHours: effectivePrecipitation > 0 ? rainHours : 0,
+      rainMinutes: effectivePrecipitation > 0 ? rainMinutes : 0,
+      rainyWindMinutes: effectivePrecipitation > 0 ? rainyWindMinutes : 0,
     };
   }
 
@@ -286,8 +294,9 @@ serve(async (req) => {
       if (slot.start >= 8 && slot.end <= 16) score -= 10;
       if (rainHours > 2) score -= 45;
       else if (rainHours > 0) score -= 18;
-      if (maxWind >= 25) score -= 28;
-      else if (maxWind >= 18) score -= 12;
+      if (maxWind >= VERY_HARD_WIND_KMH) score -= 28;
+      else if (maxWind >= HARD_WIND_KMH) score -= 18;
+      else if (maxWind > STRONG_WIND_KMH) score -= 8;
 
       const label = score >= 70 ? "excelent" : score >= 50 ? "bun" : score >= 30 ? "slab" : "evita";
       const start = String(slot.start).padStart(2, "0");
@@ -385,6 +394,7 @@ serve(async (req) => {
           dailyPrecipitation: daily.precipitation_sum[d],
           currentPrecipitation: current.precipitation,
         });
+        const effectiveHourlyPrecip = rainMetrics.precipitation > 0 ? hourlyPrecip : hourlyPrecip.map(() => 0);
 
         const windSpeed  = d === 0 ? current.windspeed_10m : daily.windspeed_10m_max[d];
         const cloudCover = d === 0 ? current.cloud_cover   : daily.cloudcover_mean[d];
@@ -416,7 +426,7 @@ serve(async (req) => {
         const feedingWindows = getFeedingSlots({
           sunrise: daily.sunrise[d],
           sunset: daily.sunset[d],
-          hourlyPrecip,
+          hourlyPrecip: effectiveHourlyPrecip,
           hourlyWind,
         });
         const calculatedAt   = `${dateStr}T12:00:00.000Z`;

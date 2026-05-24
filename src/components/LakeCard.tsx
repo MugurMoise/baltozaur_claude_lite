@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { LakeScore } from '../types/lake';
-import { getScoreColor, getScoreGradient, getScoreLevel, getRecommendation, getConditionTags } from '../types/lake';
+import { MIN_DISPLAY_PRECIPITATION_MM, getScoreColor, getScoreGradient, getScoreLevel, getRecommendation, getConditionTags } from '../types/lake';
 import type { Lang } from '../i18n';
 import { t } from '../i18n';
 
@@ -64,7 +64,11 @@ export function LakeCard({ lake, rank, lang, userLocation, highlighted = false, 
   const websiteHref = lake.website_url ?? lake.facebook_url;
   const websiteLabel = lake.website_url ?? lake.facebook_url?.replace(/^https?:\/\/(www\.)?/i, '') ?? '';
   const phoneNumbers = lake.phone?.split(/[,/]/).map((phone) => phone.trim()).filter(Boolean) ?? [];
-  const hasRainWarning = (lake.precipitation ?? 0) > 0 || (lake.rain_hours ?? 0) > 0;
+  const displayPrecipitation = (lake.precipitation ?? 0) >= MIN_DISPLAY_PRECIPITATION_MM
+    ? lake.precipitation ?? 0
+    : 0;
+  const displayRainHours = displayPrecipitation > 0 ? lake.rain_hours ?? 0 : 0;
+  const hasRainWarning = displayPrecipitation > 0;
   const wazeUrl = `https://waze.com/ul?ll=${lake.lat},${lake.lon}&navigate=yes`;
   const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${lake.lat},${lake.lon}`;
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=12&data=${encodeURIComponent(wazeUrl)}`;
@@ -274,8 +278,8 @@ export function LakeCard({ lake, rank, lang, userLocation, highlighted = false, 
               </div>
               <div className="flex flex-col gap-1">
                 <span className="text-[10px] uppercase tracking-widest text-slate-500 font-body">{tr.rain}</span>
-                <span className="text-white font-mono text-sm">{lake.precipitation ?? 0} mm</span>
-                <span className="text-xs font-mono text-slate-400">{lake.rain_hours ?? 0}h</span>
+                <span className="text-white font-mono text-sm">{displayPrecipitation} mm</span>
+                <span className="text-xs font-mono text-slate-400">{displayRainHours}h</span>
               </div>
             </div>
 
