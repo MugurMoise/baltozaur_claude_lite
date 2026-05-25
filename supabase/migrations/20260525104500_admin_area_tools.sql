@@ -1,3 +1,5 @@
+-- Admin operations UI support for dev.
+
 create table if not exists public.admin_score_settings (
   id         text primary key default 'default',
   settings   jsonb not null,
