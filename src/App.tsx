@@ -14,8 +14,6 @@ import { createLakeCodeMap } from './lib/lakeLinks';
 import { SocialSignalsPage } from './pages/SocialSignalsPage';
 import { AddLakePage } from './pages/AddLakePage';
 import { AdminSuggestionsPage } from './pages/AdminSuggestionsPage';
-import { MockScoreCardPage } from './pages/MockScoreCardPage';
-import { ProdCompactPreviewPage } from './pages/ProdCompactPreviewPage';
 
 type Tab    = 'list' | 'map';
 type Filter = 'all' | 'excellent' | 'improving';
@@ -101,12 +99,6 @@ function distanceBetweenKm(from: UserLocation, to: UserLocation) {
 }
 
 export default function App() {
-  if (window.location.pathname.startsWith('/mock-prod-cards')) {
-    return <ProdCompactPreviewPage />;
-  }
-  if (window.location.pathname.startsWith('/mock-score-card')) {
-    return <MockScoreCardPage />;
-  }
   if (window.location.pathname.startsWith('/social')) {
     return <SocialSignalsPage />;
   }
