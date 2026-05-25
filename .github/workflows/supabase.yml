@@ -74,7 +74,7 @@ jobs:
         shell: bash
         run: |
           set +e
-          output="$(printf 'y\n' | supabase --debug --dns-resolver https db push 2>&1)"
+          output="$(printf 'y\n' | supabase --dns-resolver https db push 2>&1)"
           status=$?
           echo "$output"
           if [ "$status" -ne 0 ]; then
