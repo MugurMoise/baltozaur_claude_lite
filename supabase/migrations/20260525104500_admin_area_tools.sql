@@ -36,17 +36,6 @@ create policy "Admin score settings write"
     )
   );
 
-drop policy if exists "Admin lake insert" on public.lakes;
-create policy "Admin lake insert"
-  on public.lakes for insert
-  with check (
-    exists (
-      select 1
-      from public.admin_users au
-      where au.user_id = auth.uid()
-    )
-  );
-
 drop policy if exists "Admin dev lake insert" on public.dev_lakes;
 create policy "Admin dev lake insert"
   on public.dev_lakes for insert

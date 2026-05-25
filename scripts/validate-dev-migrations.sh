@@ -11,7 +11,6 @@ for file in "$@"; do
   [ -f "$file" ] || continue
 
   case "$(basename "$file")" in
-    20260516000400_make_lake_distance_optional.sql|\
     20260517000200_add_prod_contact_and_rain_fields.sql|\
     20260517000700_remove_duplicate_corata.sql|\
     20260517000900_import_popular_romanian_lakes.sql|\
