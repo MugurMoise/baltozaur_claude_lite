@@ -45,10 +45,9 @@ serve(async (req) => {
   const offset = Number.isFinite(offsetParam) && offsetParam > 0
     ? Math.floor(offsetParam)
     : 0;
-  const tablePrefix = mode === "dev" ? "dev_" : "";
   const tables = {
-    lakes: `${tablePrefix}lakes`,
-    lakeScores: `${tablePrefix}lake_scores`,
+    lakes: "lakes",
+    lakeScores: "lake_scores",
   };
   const MIN_DISPLAY_PRECIPITATION_MM = 1;
   const STRONG_WIND_KMH = 14;
@@ -95,113 +94,6 @@ serve(async (req) => {
     } catch {
       return String(err);
     }
-  }
-
-  async function syncDevFromProd() {
-    const { data: prodLakes, error: prodLakesError } = await supabase
-      .from("lakes")
-      .select("*");
-
-    if (prodLakesError) {
-      throw prodLakesError;
-    }
-
-    const prodLakeIds = new Set((prodLakes ?? []).map((lake) => lake.id));
-
-    if (prodLakes?.length) {
-      const devLakesToUpsert = prodLakes.map((lake) => ({
-        id: lake.id,
-        name: lake.name,
-        county: lake.county ?? "Necunoscut",
-        distance_km: lake.distance_km ?? null,
-        lat: lake.lat ?? 44.4268,
-        lon: lake.lon ?? 26.1025,
-        lake_type: lake.lake_type ?? "commercial",
-        description: lake.description ?? null,
-        rules: lake.rules ?? null,
-        price: lake.price ?? null,
-        website_url: lake.website_url ?? null,
-        facebook_url: lake.facebook_url ?? null,
-        phone: lake.phone ?? null,
-        country: lake.country ?? "RO",
-        region: lake.region ?? lake.county ?? null,
-        created_at: lake.created_at ?? new Date().toISOString(),
-      }));
-
-      const { error: lakesUpsertError } = await supabase
-        .from("dev_lakes")
-        .upsert(devLakesToUpsert, { onConflict: "id" });
-
-      if (lakesUpsertError) {
-        const fallbackLakes = devLakesToUpsert.map(({ phone, rules, price, country, region, ...lake }) => lake);
-        const { error: fallbackLakesUpsertError } = await supabase
-          .from("dev_lakes")
-          .upsert(fallbackLakes, { onConflict: "id" });
-
-        if (fallbackLakesUpsertError) {
-          throw fallbackLakesUpsertError;
-        }
-      }
-    }
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const { error: deleteScoresError } = await supabase
-      .from("dev_lake_scores")
-      .delete()
-      .gte("calculated_at", today.toISOString());
-
-    if (deleteScoresError) {
-      throw deleteScoresError;
-    }
-
-    let { data: prodScores, error: prodScoresError } = await supabase
-      .from("lake_scores")
-      .select("lake_id, score, pressure, pressure_delta, wind_speed, temperature, temperature_delta, feeding_windows, calculated_at, precipitation, rain_hours")
-      .gte("calculated_at", today.toISOString());
-
-    if (prodScoresError) {
-      const fallback = await supabase
-        .from("lake_scores")
-        .select("lake_id, score, pressure, pressure_delta, wind_speed, temperature, temperature_delta, feeding_windows, calculated_at")
-        .gte("calculated_at", today.toISOString());
-
-      prodScores = fallback.data?.map((score) => ({
-        ...score,
-        precipitation: null,
-        rain_hours: 0,
-      })) ?? null;
-      prodScoresError = fallback.error;
-    }
-
-    if (prodScoresError) {
-      throw prodScoresError;
-    }
-
-    const devScoresToInsert = (prodScores ?? []).filter((score) => prodLakeIds.has(score.lake_id));
-
-    if (devScoresToInsert.length) {
-      const { error: insertScoresError } = await supabase
-        .from("dev_lake_scores")
-        .insert(devScoresToInsert);
-
-      if (insertScoresError) {
-        const fallbackScores = devScoresToInsert.map(({ precipitation, rain_hours, ...score }) => score);
-        const { error: fallbackInsertScoresError } = await supabase
-          .from("dev_lake_scores")
-          .insert(fallbackScores);
-
-        if (fallbackInsertScoresError) {
-          throw fallbackInsertScoresError;
-        }
-      }
-    }
-
-    return {
-      lakes: prodLakes?.length ?? 0,
-      scores: devScoresToInsert.length,
-    };
   }
 
   async function loadScoreSettings(): Promise<ScoreSettings> {
@@ -484,15 +376,8 @@ serve(async (req) => {
     }
   }
 
-  let syncedDev: { lakes: number; scores: number } | null = null;
-  let syncDevError: string | null = null;
-  if (mode !== "dev") {
-    try {
-      syncedDev = await syncDevFromProd();
-    } catch (err) {
-      syncDevError = errorMessage(err);
-    }
-  }
+  const syncedDev: { lakes: number; scores: number } | null = null;
+  const syncDevError: string | null = null;
 
   return new Response(
     JSON.stringify({ success: true, mode, lakeId, limit, offset, processed: results.length, results, syncedDev, syncDevError }),

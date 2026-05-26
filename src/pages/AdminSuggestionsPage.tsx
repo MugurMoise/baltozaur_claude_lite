@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
-import { appEnv, isDevEnvironment, supabase, tables } from '../lib/supabase';
+import { appEnv, isDevEnvironment, supabase, tables, usesCommonLakeDatabase } from '../lib/supabase';
 
 interface LakeSuggestion {
   id: string;
@@ -453,7 +453,7 @@ export function AdminSuggestionsPage() {
     const limit = Number(refreshLimit);
     const { data, error } = await supabase.functions.invoke('calculate-scores', {
       body: {
-        env: appEnv,
+        env: usesCommonLakeDatabase ? 'prod' : appEnv,
         limit: lakeId ? null : (Number.isFinite(limit) && limit > 0 ? limit : null),
         lake_id: lakeId ?? null,
       },
@@ -633,7 +633,7 @@ export function AdminSuggestionsPage() {
             <a href="/" className="text-sm text-slate-500 hover:text-white">← Baltozaur</a>
             <h1 className="mt-2 font-display text-4xl">Admin Baltozaur</h1>
             <p className="mt-1 text-sm text-slate-400">
-              {session.user.email} · {isDevEnvironment ? 'dev' : 'prod'}
+              {session.user.email} · {isDevEnvironment ? 'dev UI · lacuri comune' : 'prod'}
             </p>
           </div>
 
@@ -673,7 +673,7 @@ export function AdminSuggestionsPage() {
             <div className="rounded-lg border border-white/10 bg-white/[0.04] p-5">
               <h2 className="text-xl font-semibold">Refresh vreme si scoruri</h2>
               <p className="mt-2 text-sm text-slate-400">
-                Ruleaza functia Supabase `calculate-scores` pentru mediul curent. Pentru refresh complet lasa limita goala.
+                Ruleaza functia Supabase `calculate-scores` pentru tabela comuna de lacuri. Pentru refresh complet lasa limita goala.
               </p>
 
               <div className="mt-5 grid max-w-sm gap-2">

@@ -2,11 +2,11 @@
 
 Baltozaur uses two Git branches and one Supabase project.
 
-Because Supabase Branching and extra projects are not available, development data lives in separate `dev_*` tables inside the same Supabase project.
+Because Supabase Branching and extra projects are not available, development and production share the same canonical lake catalog and score tables. Auxiliary dev data can still live in separate `dev_*` tables inside the same Supabase project.
 
 | Environment | Git branch | Vercel target | Supabase tables |
 | --- | --- | --- | --- |
-| Development | `dev` | Preview / `dev.baltozaur.ro` | `dev_lakes`, `dev_lake_scores`, `dev_latest_lake_scores` |
+| Development | `dev` | Preview / `dev.baltozaur.ro` | `lakes`, `lake_scores`, `latest_lake_scores` |
 | Production | `main` | Production / `baltozaur.ro` | `lakes`, `lake_scores`, `latest_lake_scores` |
 
 ## Environment Switch
@@ -17,7 +17,7 @@ The frontend chooses tables with `VITE_APP_ENV`:
 VITE_APP_ENV=dev
 ```
 
-When `VITE_APP_ENV=dev`, the app reads from `dev_*` tables. Any other value, or an unset value, uses production table names.
+When `VITE_APP_ENV=dev`, the app still reads lakes and scores from the common `lakes`, `lake_scores`, and `latest_lake_scores` tables. Auxiliary tables such as suggestions, social posts, and push subscriptions keep their `dev_*` prefix. Any other value, or an unset value, uses production table names everywhere.
 
 ## Local Development
 
@@ -56,14 +56,14 @@ Use `main` as the production branch in Vercel. Pushes to `dev` should create pre
 
 Apply the migration in `supabase/migrations/20260516000100_dev_environment_tables.sql`.
 
-It creates:
+It creates legacy dev mirror tables:
 
 - `dev_lakes`
 - `dev_lake_scores`
 - `dev_latest_lake_scores`
 - `dev_push_subscriptions`
 
-It also inserts a tiny seed dataset so dev has data before the weather job runs.
+It also inserts a tiny seed dataset. The current app uses the common lake and score tables instead of these mirror tables.
 
 ## Supabase Pipeline
 
@@ -87,7 +87,7 @@ Because dev and prod share one Supabase project, the `dev` guard is intentionall
 
 ## Edge Function Dev Mode
 
-The `calculate-scores` Edge Function chooses tables with a query parameter:
+The `calculate-scores` Edge Function now writes to the common `lakes` and `lake_scores` tables. The `env` query parameter is kept for compatibility:
 
 ```text
 /functions/v1/calculate-scores?env=dev
@@ -99,19 +99,19 @@ For production, call the function without the query parameter:
 /functions/v1/calculate-scores
 ```
 
-This keeps the production cron path unchanged while letting manual/dev runs write to `dev_*` tables.
+Manual/dev runs and production cron runs refresh the same canonical score rows.
 
 ## Scheduled Score Refresh
 
 The database migration `20260521171021_schedule_calculate_scores_cron.sql` registers a Supabase cron job named `calculate-scores-every-3-hours`.
 
-It calls the production `calculate-scores` Edge Function at minute 0 every 3 hours. A production run refreshes weather-backed scores for today and the next 6 forecast days, then mirrors those rows into `dev_*` score tables.
+It calls the production `calculate-scores` Edge Function at minute 0 every 3 hours. A production run refreshes weather-backed scores for today and the next 6 forecast days in the common score table.
 
 ## Release Flow
 
 1. Work on `dev`.
 2. Test the Vercel preview with `VITE_APP_ENV=dev`.
-3. Test Edge Function changes against `dev_*` tables using `calculate-scores?env=dev`.
+3. Test Edge Function changes with small limits, for example `calculate-scores?limit=1`.
 4. Merge `dev` into `main`.
 5. Vercel deploys `main` to `baltozaur.ro` with `VITE_APP_ENV=prod`.
 
