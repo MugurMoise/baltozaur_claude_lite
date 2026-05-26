@@ -278,7 +278,9 @@ export function AdminSuggestionsPage() {
   const [suggestions, setSuggestions] = useState<LakeSuggestion[]>([]);
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState<Filter>('pending');
-  const [tab, setTab] = useState<Tab>('refresh');
+  const [tab, setTab] = useState<Tab>(() => (
+    window.location.pathname.startsWith('/admin/lakes') ? 'lakes' : 'refresh'
+  ));
   const [refreshingScores, setRefreshingScores] = useState(false);
   const [refreshLimit, setRefreshLimit] = useState('10');
   const [settings, setSettings] = useState<ScoreSettings>(DEFAULT_SCORE_SETTINGS);
@@ -305,6 +307,17 @@ export function AdminSuggestionsPage() {
       `${lake.name} ${lake.county ?? ''} ${lake.region ?? ''} ${lake.country ?? ''}`.toLowerCase().includes(query)
     ));
   }, [lakeQuery, lakes]);
+
+  function selectTab(nextTab: Tab) {
+    setTab(nextTab);
+    if (nextTab === 'lakes') {
+      window.history.replaceState(null, '', '/admin/lakes');
+      return;
+    }
+    if (window.location.pathname.startsWith('/admin/lakes')) {
+      window.history.replaceState(null, '', '/admin');
+    }
+  }
 
   useEffect(() => {
     if (!supabase) return;
@@ -635,7 +648,7 @@ export function AdminSuggestionsPage() {
               <button
                 key={value}
                 type="button"
-                onClick={() => setTab(value)}
+                onClick={() => selectTab(value)}
                 className={`h-10 rounded-lg px-4 text-sm transition ${tab === value ? 'bg-lime-300 text-mud-900' : 'border border-white/10 text-slate-200 hover:bg-white/5'}`}
               >
                 {label}
