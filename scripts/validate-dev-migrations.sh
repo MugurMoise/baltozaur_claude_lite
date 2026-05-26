@@ -14,6 +14,7 @@ for file in "$@"; do
     20260517000200_add_prod_contact_and_rain_fields.sql|\
     20260517000700_remove_duplicate_corata.sql|\
     20260517000900_import_popular_romanian_lakes.sql|\
+    20260519000300_remote_history_placeholder.sql|\
     push_subscriptions.sql)
       continue
       ;;

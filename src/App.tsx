@@ -102,7 +102,7 @@ export default function App() {
   if (window.location.pathname.startsWith('/social')) {
     return <SocialSignalsPage />;
   }
-  if (window.location.pathname.startsWith('/admin/suggestions')) {
+  if (window.location.pathname.startsWith('/admin')) {
     return <AdminSuggestionsPage />;
   }
   if (window.location.pathname.startsWith('/suggest-lake') || window.location.pathname.startsWith('/add-lake')) {

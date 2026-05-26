@@ -5,19 +5,20 @@ import { getLocalDateKey } from './date';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
-const appEnv = (import.meta.env.VITE_APP_ENV as string | undefined) ?? 'prod';
-const tablePrefix = appEnv === 'dev' ? 'dev_' : '';
+export const appEnv = (import.meta.env.VITE_APP_ENV as string | undefined) ?? 'prod';
+const envTablePrefix = appEnv === 'dev' ? 'dev_' : '';
 const FORECAST_DAY_COUNT = 7;
 
 export const isDevEnvironment = appEnv === 'dev';
+export const usesCommonLakeDatabase = true;
 export const tables = {
-  lakes: `${tablePrefix}lakes`,
-  lakeScores: `${tablePrefix}lake_scores`,
-  latestLakeScores: `${tablePrefix}latest_lake_scores`,
-  pushSubscriptions: `${tablePrefix}push_subscriptions`,
-  socialPosts: `${tablePrefix}social_posts`,
-  socialPostAnalysis: `${tablePrefix}social_post_analysis`,
-  lakeSuggestions: `${tablePrefix}lake_suggestions`,
+  lakes: 'lakes',
+  lakeScores: 'lake_scores',
+  latestLakeScores: 'latest_lake_scores',
+  pushSubscriptions: `${envTablePrefix}push_subscriptions`,
+  socialPosts: `${envTablePrefix}social_posts`,
+  socialPostAnalysis: `${envTablePrefix}social_post_analysis`,
+  lakeSuggestions: `${envTablePrefix}lake_suggestions`,
 } as const;
 
 export const supabase =
@@ -197,51 +198,7 @@ async function enrichWithLiveRain(lakes: LakeScore[], day: string): Promise<Lake
 }
 
 async function enrichWithProdLakeDetails(lakes: LakeScore[]): Promise<LakeScore[]> {
-  if (!supabase || !isDevEnvironment || lakes.length === 0) return lakes;
-
-  const missingDetails = lakes.filter((lake) => (
-    !lake.rules ||
-    !lake.price ||
-    !lake.website_url ||
-    !lake.facebook_url ||
-    !lake.phone
-  ));
-  if (missingDetails.length === 0) return lakes;
-
-  const { data, error } = await supabase
-    .from('lakes')
-    .select('id, rules, price, website_url, facebook_url, phone')
-    .in('id', missingDetails.map((lake) => lake.lake_id));
-
-  if (error || !data) {
-    console.warn('[Baltozaur] prod lake details fallback failed:', error?.message);
-    return lakes;
-  }
-
-  const detailsByLake = new Map(
-    (data as {
-      id: string;
-      rules: string | null;
-      price: string | null;
-      website_url: string | null;
-      facebook_url: string | null;
-      phone: string | null;
-    }[])
-      .map((lake) => [lake.id, lake])
-  );
-
-  return lakes.map((lake) => {
-    const details = detailsByLake.get(lake.lake_id);
-    if (!details) return lake;
-    return {
-      ...lake,
-      rules: lake.rules ?? details.rules ?? null,
-      price: lake.price ?? details.price ?? null,
-      website_url: lake.website_url ?? details.website_url ?? null,
-      facebook_url: lake.facebook_url ?? details.facebook_url ?? null,
-      phone: lake.phone ?? details.phone ?? null,
-    };
-  });
+  return lakes;
 }
 
 // ── Sample fallback data using real lake names ───────────────────────────────
@@ -445,6 +402,9 @@ export async function fetchLakeScoresForDay(day: string): Promise<LakeScore[]> {
   }
 
   if (!data || data.length === 0) {
+    if (import.meta.env.DEV) {
+      return SAMPLE_LAKES.filter((l) => l.calculated_at.startsWith(day));
+    }
     return [];
   }
 

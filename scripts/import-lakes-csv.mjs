@@ -182,7 +182,7 @@ async function supabaseFetch(pathname, options = {}) {
 }
 
 async function importLakes(lakes) {
-  const table = appEnv === 'dev' ? 'dev_lakes' : 'lakes';
+  const table = 'lakes';
   if (dryRun) {
     console.log(`Dry run: would import ${lakes.length} lakes into ${table}.`);
     return { table, inserted: 0 };
@@ -208,14 +208,14 @@ async function importLakes(lakes) {
 }
 
 async function calculateScores() {
-  const count = await supabaseFetch(`/rest/v1/${appEnv === 'dev' ? 'dev_lakes' : 'lakes'}?select=id`, {
+  const count = await supabaseFetch('/rest/v1/lakes?select=id', {
     headers: { Prefer: 'count=exact' },
   });
   const total = Array.isArray(count) ? count.length : 0;
 
   for (let offset = 0; offset < total; offset += batchSize) {
     const result = await supabaseFetch(
-      `/functions/v1/calculate-scores?env=${appEnv}&limit=${batchSize}&offset=${offset}`,
+      `/functions/v1/calculate-scores?env=prod&limit=${batchSize}&offset=${offset}`,
       { method: 'POST' },
     );
     console.log(`Scores ${appEnv} offset=${offset}: processed ${result.processed}`);
