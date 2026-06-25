@@ -32,7 +32,7 @@ The app reads from `latest_lake_scores` view/table with these columns:
 | id | uuid/text | Primary key |
 | name | text | Lake name |
 | county | text | Romanian county |
-| distance_km | float | Distance from Bucharest |
+| distance_km | float/null | Optional distance from Bucharest, used only for Romanian/local lakes |
 | lat / lon | float | Coordinates |
 | score | float | 0–100 fishing score |
 | temperature | float | Water/air temp °C |
@@ -65,6 +65,20 @@ vercel deploy
 
 Set environment variables in Vercel dashboard under Project Settings → Environment Variables.
 
+## Mobile Development
+
+The iOS and Android apps are powered by Capacitor and reuse the Vite build from `dist/`.
+
+```bash
+npm run mobile:sync
+npm run mobile:ios
+npm run mobile:android
+```
+
+- `mobile:sync` builds the web app and copies it into both native projects.
+- `mobile:ios` opens the native project in Xcode after syncing.
+- `mobile:android` opens the native project in Android Studio after syncing.
+
 ## Stack
 
 - React 18 + TypeScript
@@ -72,4 +86,5 @@ Set environment variables in Vercel dashboard under Project Settings → Environ
 - Tailwind CSS
 - Supabase JS client
 - Leaflet + react-leaflet
+- Capacitor for iOS and Android
 - Auto-refresh every 60 seconds

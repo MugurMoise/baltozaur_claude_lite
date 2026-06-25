@@ -53,7 +53,7 @@ begin
       id,
       'Dev ' || regexp_replace(name, '^Dev\s+', ''),
       coalesce(county, 'Necunoscut'),
-      coalesce(distance_km, 0),
+      distance_km,
       coalesce(lat, 44.4268),
       coalesce(lon, 26.1025),
       %s,

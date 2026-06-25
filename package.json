@@ -7,9 +7,15 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "import:lakes": "node scripts/import-lakes-csv.mjs",
+    "mobile:sync": "npm run build && cap sync",
+    "mobile:ios": "npm run mobile:sync && cap open ios",
+    "mobile:android": "npm run mobile:sync && cap open android",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@capacitor/android": "^8.3.4",
+    "@capacitor/core": "^8.3.4",
+    "@capacitor/ios": "^8.3.4",
     "@supabase/supabase-js": "^2.43.4",
     "leaflet": "^1.9.4",
     "react": "^18.3.1",
@@ -17,6 +23,7 @@
     "react-leaflet": "^4.2.1"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.3.4",
     "@types/leaflet": "^1.9.12",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",

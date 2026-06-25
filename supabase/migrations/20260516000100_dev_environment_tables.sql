@@ -5,7 +5,7 @@ create table if not exists dev_lakes (
   id           uuid primary key default gen_random_uuid(),
   name         text not null,
   county       text not null,
-  distance_km  numeric not null default 0,
+  distance_km  numeric,
   lat          double precision not null,
   lon          double precision not null,
   lake_type    text default 'commercial',
