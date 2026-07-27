@@ -93,6 +93,13 @@ type Filter = 'pending' | 'all';
 
 const SETTINGS_ID = 'default';
 
+function initialAdminTab(pathname: string): Tab {
+  if (pathname.startsWith('/admin/analytics')) return 'analytics';
+  if (pathname.startsWith('/admin/lakes')) return 'lakes';
+  if (pathname.startsWith('/admin/suggestions')) return 'suggestions';
+  return 'refresh';
+}
+
 const DEFAULT_SCORE_SETTINGS: ScoreSettings = {
   baseScore: 55,
   idealTempMin: 18,
@@ -279,11 +286,7 @@ export function AdminSuggestionsPage() {
   const [suggestions, setSuggestions] = useState<LakeSuggestion[]>([]);
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState<Filter>('pending');
-  const [tab, setTab] = useState<Tab>(() => (
-    window.location.pathname.startsWith('/admin/analytics')
-      ? 'analytics'
-      : window.location.pathname.startsWith('/admin/lakes') ? 'lakes' : 'refresh'
-  ));
+  const [tab, setTab] = useState<Tab>(() => initialAdminTab(window.location.pathname));
   const [refreshingScores, setRefreshingScores] = useState(false);
   const [refreshLimit, setRefreshLimit] = useState('10');
   const [settings, setSettings] = useState<ScoreSettings>(DEFAULT_SCORE_SETTINGS);
@@ -359,7 +362,7 @@ export function AdminSuggestionsPage() {
     const { error } = await supabase.auth.signInWithOtp({
       email: email.trim(),
       options: {
-        emailRedirectTo: `${window.location.origin}/admin/suggestions`,
+        emailRedirectTo: `${window.location.origin}${window.location.pathname}`,
       },
     });
 
