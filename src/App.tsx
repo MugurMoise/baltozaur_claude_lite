@@ -11,6 +11,7 @@ import { BestFeedingSection } from './components/BestFeedingSection';
 import { HowItWorks } from './components/HowItWorks';
 import { getLocalDateKey } from './lib/date';
 import { createLakeCodeMap } from './lib/lakeLinks';
+import { trackEvent } from './lib/analytics';
 import { SocialSignalsPage } from './pages/SocialSignalsPage';
 import { AddLakePage } from './pages/AddLakePage';
 import { AdminSuggestionsPage } from './pages/AdminSuggestionsPage';
@@ -205,6 +206,20 @@ function DashboardApp() {
   }, [areaMode, filter, internationalPreference, maxDistanceKm, searchQuery, selectedCounty, selectedDay]);
 
   useEffect(() => {
+    const queryLength = searchQuery.trim().length;
+    if (queryLength === 0) return;
+
+    const timeout = window.setTimeout(() => {
+      trackEvent('search_used', {
+        query_length: queryLength,
+        result_count: filtered.length,
+      });
+    }, 700);
+
+    return () => window.clearTimeout(timeout);
+  }, [filtered.length, searchQuery]);
+
+  useEffect(() => {
     const mediaQuery = window.matchMedia('(min-width: 1024px) and (hover: hover) and (pointer: fine)');
     const updateDetectedView = () => setDetectedView(mediaQuery.matches ? 'desktop' : 'mobile');
     updateDetectedView();
@@ -243,6 +258,7 @@ function DashboardApp() {
 
   const handleLangChange = (nextLang: Lang) => {
     setLang(nextLang);
+    trackEvent('language_changed', { language: nextLang });
     if (nextLang !== 'ro' && !internationalPreference) {
       setShowInternationalPrompt(true);
     }
@@ -251,6 +267,7 @@ function DashboardApp() {
   const handleViewModeChange = (nextViewMode: ViewMode) => {
     setViewMode(nextViewMode);
     saveViewMode(nextViewMode);
+    trackEvent('view_mode_changed', { view_mode: nextViewMode });
   };
 
   const forecastDateLabel = (() => {
@@ -260,8 +277,10 @@ function DashboardApp() {
   })();
 
   const requestLocation = () => {
+    trackEvent('location_requested');
     if (!navigator.geolocation) {
       setLocationStatus('denied');
+      trackEvent('location_denied', { reason: 'unsupported' });
       return;
     }
 
@@ -273,8 +292,12 @@ function DashboardApp() {
           lon: position.coords.longitude,
         });
         setLocationStatus('idle');
+        trackEvent('location_granted');
       },
-      () => setLocationStatus('denied'),
+      () => {
+        setLocationStatus('denied');
+        trackEvent('location_denied', { reason: 'browser' });
+      },
       { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 }
     );
   };
@@ -429,7 +452,10 @@ function DashboardApp() {
       {(['list', 'map'] as Tab[]).map((t_) => (
         <button
           key={t_}
-          onClick={() => setTab(t_)}
+          onClick={() => {
+            setTab(t_);
+            trackEvent(t_ === 'map' ? 'map_opened' : 'list_opened');
+          }}
           className={`flex-1 py-2.5 rounded-xl text-sm font-body font-semibold transition-all ${
             tab === t_
               ? 'bg-lake-600 text-white shadow-lg'
@@ -453,7 +479,10 @@ function DashboardApp() {
         ] as { key: Filter; label: string }[]).map(({ key, label }) => (
           <button
             key={key}
-            onClick={() => setFilter(key)}
+            onClick={() => {
+              setFilter(key);
+              trackEvent('filter_changed', { filter: key });
+            }}
             className={`shrink-0 text-sm font-body font-medium px-4 py-2 rounded-2xl border transition-all ${
               filter === key
                 ? 'bg-lake-600/30 border-lake-500/50 text-white'
@@ -536,7 +565,10 @@ function DashboardApp() {
         <DashboardHeader
           lastUpdated={lastUpdated}
           refreshing={refreshing}
-          onRefresh={refresh}
+          onRefresh={() => {
+            trackEvent('data_refreshed');
+            refresh();
+          }}
           lakeCount={isInternational && internationalPreference ? filtered.length : lakes.length}
           isToday={isToday}
           lang={lang}
@@ -608,7 +640,11 @@ function DashboardApp() {
               days={availableDays}
               selected={selectedDay}
               lang={lang}
-              onSelect={(day) => { setSelectedDay(day); setFilter('all'); }}
+              onSelect={(day) => {
+                setSelectedDay(day);
+                setFilter('all');
+                trackEvent('forecast_day_selected', { day_offset: availableDays.indexOf(day) });
+              }}
             />
           )}
 
