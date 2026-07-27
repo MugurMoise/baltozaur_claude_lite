@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { appEnv, isDevEnvironment, supabase, tables, usesCommonLakeDatabase } from '../lib/supabase';
+import { AdminAnalyticsPanel } from './AdminAnalyticsPanel';
 
 interface LakeSuggestion {
   id: string;
@@ -87,10 +88,17 @@ interface AdminLake {
   created_at: string | null;
 }
 
-type Tab = 'refresh' | 'settings' | 'quick-add' | 'lakes' | 'suggestions';
+type Tab = 'analytics' | 'refresh' | 'settings' | 'quick-add' | 'lakes' | 'suggestions';
 type Filter = 'pending' | 'all';
 
 const SETTINGS_ID = 'default';
+
+function initialAdminTab(pathname: string): Tab {
+  if (pathname.startsWith('/admin/analytics')) return 'analytics';
+  if (pathname.startsWith('/admin/lakes')) return 'lakes';
+  if (pathname.startsWith('/admin/suggestions')) return 'suggestions';
+  return 'refresh';
+}
 
 const DEFAULT_SCORE_SETTINGS: ScoreSettings = {
   baseScore: 55,
@@ -278,9 +286,7 @@ export function AdminSuggestionsPage() {
   const [suggestions, setSuggestions] = useState<LakeSuggestion[]>([]);
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState<Filter>('pending');
-  const [tab, setTab] = useState<Tab>(() => (
-    window.location.pathname.startsWith('/admin/lakes') ? 'lakes' : 'refresh'
-  ));
+  const [tab, setTab] = useState<Tab>(() => initialAdminTab(window.location.pathname));
   const [refreshingScores, setRefreshingScores] = useState(false);
   const [refreshLimit, setRefreshLimit] = useState('10');
   const [settings, setSettings] = useState<ScoreSettings>(DEFAULT_SCORE_SETTINGS);
@@ -310,11 +316,15 @@ export function AdminSuggestionsPage() {
 
   function selectTab(nextTab: Tab) {
     setTab(nextTab);
+    if (nextTab === 'analytics') {
+      window.history.replaceState(null, '', '/admin/analytics');
+      return;
+    }
     if (nextTab === 'lakes') {
       window.history.replaceState(null, '', '/admin/lakes');
       return;
     }
-    if (window.location.pathname.startsWith('/admin/lakes')) {
+    if (window.location.pathname.startsWith('/admin/lakes') || window.location.pathname.startsWith('/admin/analytics')) {
       window.history.replaceState(null, '', '/admin');
     }
   }
@@ -352,7 +362,7 @@ export function AdminSuggestionsPage() {
     const { error } = await supabase.auth.signInWithOtp({
       email: email.trim(),
       options: {
-        emailRedirectTo: `${window.location.origin}/admin/suggestions`,
+        emailRedirectTo: `${window.location.origin}${window.location.pathname}`,
       },
     });
 
@@ -639,6 +649,7 @@ export function AdminSuggestionsPage() {
 
           <div className="flex flex-wrap items-center gap-2">
             {([
+              ['analytics', 'Analytics'],
               ['refresh', 'Refresh'],
               ['settings', 'Ecuatie'],
               ['quick-add', 'Adauga balta'],
@@ -667,6 +678,8 @@ export function AdminSuggestionsPage() {
         {message && (
           <p className="mt-4 rounded-lg border border-amber-300/30 bg-amber-300/10 p-3 text-sm text-amber-100">{message}</p>
         )}
+
+        {tab === 'analytics' && <AdminAnalyticsPanel environment={appEnv} />}
 
         {tab === 'refresh' && (
           <section className="mt-5 grid gap-4 lg:grid-cols-[1fr_320px]">

@@ -3,6 +3,7 @@ import type { LakeScore } from '../types/lake';
 import { MIN_DISPLAY_PRECIPITATION_MM, getScoreColor, getScoreGradient, getScoreLevel, getRecommendation, getConditionTags } from '../types/lake';
 import type { Lang } from '../i18n';
 import { t } from '../i18n';
+import { trackEvent } from '../lib/analytics';
 
 interface Props {
   lake: LakeScore;
@@ -141,13 +142,44 @@ export function LakeCard({ lake, rank, lang, userLocation, highlighted = false, 
   const isGood = level === 'excellent' || level === 'veryGood' || level === 'good';
 
   useEffect(() => {
-    if (highlighted) setExpanded(true);
+    if (highlighted) {
+      setExpanded(true);
+      trackEvent('shared_lake_opened', {
+        lake_id: lake.lake_id,
+        lake_name: lake.name,
+      });
+    }
   }, [highlighted]);
 
   const copyShareLink = async () => {
     await navigator.clipboard?.writeText(shareUrl);
     setCopied(true);
+    trackEvent('share_link_copied', {
+      lake_id: lake.lake_id,
+      lake_name: lake.name,
+    });
     window.setTimeout(() => setCopied(false), 1600);
+  };
+
+  const toggleDetails = () => {
+    setExpanded((current) => {
+      if (!current) {
+        trackEvent('lake_details_opened', {
+          lake_id: lake.lake_id,
+          lake_name: lake.name,
+          score: Math.round(lake.score),
+        });
+      }
+      return !current;
+    });
+  };
+
+  const trackLakeAction = (eventName: string, destination?: string) => {
+    trackEvent(eventName, {
+      lake_id: lake.lake_id,
+      lake_name: lake.name,
+      destination: destination ?? null,
+    });
   };
 
   return (
@@ -226,7 +258,10 @@ export function LakeCard({ lake, rank, lang, userLocation, highlighted = false, 
           {showQrNavigation ? (
             <button
               type="button"
-              onClick={() => setShowNavigationQr(true)}
+              onClick={() => {
+                setShowNavigationQr(true);
+                trackLakeAction('navigation_clicked', 'waze_qr');
+              }}
               className="flex-1 flex items-center justify-center gap-2 bg-lake-600/30 border border-lake-500/40 hover:bg-lake-600/50 text-white rounded-2xl py-3 font-body font-semibold text-sm transition-all active:scale-95"
             >
               {tr.navigate}
@@ -236,6 +271,7 @@ export function LakeCard({ lake, rank, lang, userLocation, highlighted = false, 
               href={directionsUrl}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={() => trackLakeAction('navigation_clicked', 'google_maps')}
               className="flex-1 flex items-center justify-center gap-2 bg-lake-600/30 border border-lake-500/40 hover:bg-lake-600/50 text-white rounded-2xl py-3 font-body font-semibold text-sm transition-all active:scale-95"
             >
               {tr.navigate}
@@ -244,7 +280,7 @@ export function LakeCard({ lake, rank, lang, userLocation, highlighted = false, 
 
           {/* Expand for tech details */}
           <button
-            onClick={() => setExpanded((e) => !e)}
+            onClick={toggleDetails}
             className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-400 hover:text-white transition-all active:scale-95"
             title="Detalii tehnice"
           >
@@ -384,6 +420,7 @@ export function LakeCard({ lake, rank, lang, userLocation, highlighted = false, 
                     href={websiteHref}
                     target="_blank"
                     rel="noopener noreferrer"
+                    onClick={() => trackLakeAction('website_clicked', websiteHref === lake.website_url ? 'website' : 'facebook')}
                     className="break-words text-sm font-body text-slate-200 hover:text-white"
                   >
                     {websiteLabel}
@@ -397,7 +434,12 @@ export function LakeCard({ lake, rank, lang, userLocation, highlighted = false, 
                 {phoneNumbers.length > 0 ? (
                   <div className="flex flex-wrap gap-x-2 gap-y-1">
                     {phoneNumbers.map((phone) => (
-                      <a key={phone} href={`tel:${phone.replace(/[^\d+]/g, '')}`} className="text-sm font-body text-slate-200 hover:text-white">
+                      <a
+                        key={phone}
+                        href={`tel:${phone.replace(/[^\d+]/g, '')}`}
+                        onClick={() => trackLakeAction('phone_clicked', 'phone')}
+                        className="text-sm font-body text-slate-200 hover:text-white"
+                      >
                         {phone}
                       </a>
                     ))}
@@ -468,6 +510,7 @@ export function LakeCard({ lake, rank, lang, userLocation, highlighted = false, 
               href={wazeUrl}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={() => trackLakeAction('navigation_clicked', 'waze')}
               className="mt-4 flex w-full items-center justify-center rounded-xl border border-lake-500/40 bg-lake-600/25 px-3 py-3 text-sm font-semibold text-white transition-all hover:bg-lake-600/40"
             >
               {tr.openWaze}
