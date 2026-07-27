@@ -10,11 +10,19 @@ interface Acquisition {
   referrerDomain: string | null;
 }
 
+interface VisitorContext {
+  country: string | null;
+  region: string | null;
+  city: string | null;
+  excluded: boolean;
+}
+
 const MAX_METADATA_FIELDS = 12;
 const MAX_METADATA_STRING_LENGTH = 160;
 const sessionId = createSessionId();
 const acquisition = detectAcquisition();
 const landingPath = safePath(window.location.pathname);
+let visitorContextPromise: Promise<VisitorContext> | null = null;
 
 function createSessionId() {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
@@ -116,6 +124,33 @@ function detectDeviceType() {
   return 'desktop';
 }
 
+async function loadVisitorContext(): Promise<VisitorContext> {
+  try {
+    const response = await fetch('/api/visitor-context', {
+      headers: { Accept: 'application/json' },
+      cache: 'no-store',
+    });
+    if (!response.ok || !response.headers.get('content-type')?.includes('application/json')) {
+      return { country: null, region: null, city: null, excluded: false };
+    }
+
+    const raw = await response.json() as Partial<VisitorContext>;
+    return {
+      country: typeof raw.country === 'string' ? raw.country.slice(0, 2).toUpperCase() : null,
+      region: typeof raw.region === 'string' ? raw.region.slice(0, 80) : null,
+      city: typeof raw.city === 'string' ? raw.city.slice(0, 120) : null,
+      excluded: raw.excluded === true,
+    };
+  } catch {
+    return { country: null, region: null, city: null, excluded: false };
+  }
+}
+
+function getVisitorContext() {
+  visitorContextPromise ??= loadVisitorContext();
+  return visitorContextPromise;
+}
+
 function cleanMetadata(metadata: AnalyticsMetadata): AnalyticsMetadata {
   return Object.fromEntries(
     Object.entries(metadata)
@@ -128,26 +163,36 @@ function cleanMetadata(metadata: AnalyticsMetadata): AnalyticsMetadata {
 }
 
 export function trackEvent(eventName: string, metadata: AnalyticsMetadata = {}) {
-  if (!supabase || window.location.pathname.startsWith('/admin')) return;
+  const analyticsClient = supabase;
+  if (!analyticsClient || window.location.pathname.startsWith('/admin')) return;
 
   const name = eventName.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_').slice(0, 64);
   if (!name) return;
 
-  void supabase.rpc('track_analytics_event', {
-    p_event_name: name,
-    p_session_id: sessionId,
-    p_app_environment: appEnv,
-    p_source: acquisition.source,
-    p_medium: acquisition.medium,
-    p_campaign: acquisition.campaign,
-    p_referrer_domain: acquisition.referrerDomain,
-    p_landing_path: landingPath,
-    p_page_path: safePath(window.location.pathname),
-    p_platform: detectPlatform(),
-    p_device_type: detectDeviceType(),
-    p_language: navigator.language.slice(0, 16),
-    p_metadata: cleanMetadata(metadata),
-  }).then(({ error }) => {
+  void getVisitorContext().then(async (visitorContext) => {
+    if (visitorContext.excluded) return;
+
+    const { error } = await analyticsClient.rpc('track_analytics_event', {
+      p_event_name: name,
+      p_session_id: sessionId,
+      p_app_environment: appEnv,
+      p_source: acquisition.source,
+      p_medium: acquisition.medium,
+      p_campaign: acquisition.campaign,
+      p_referrer_domain: acquisition.referrerDomain,
+      p_landing_path: landingPath,
+      p_page_path: safePath(window.location.pathname),
+      p_platform: detectPlatform(),
+      p_device_type: detectDeviceType(),
+      p_language: navigator.language.slice(0, 16),
+      p_metadata: cleanMetadata({
+        geo_country: visitorContext.country,
+        geo_region: visitorContext.region,
+        geo_city: visitorContext.city,
+        ...metadata,
+      }),
+    });
+
     if (error && import.meta.env.DEV) {
       console.warn('[Baltozaur] analytics event was not recorded:', error.message);
     }
