@@ -4,6 +4,8 @@ import { getLocale, LANGUAGES, langMeta, t } from '../i18n';
 type ViewMode = 'auto' | 'mobile' | 'desktop';
 type EffectiveView = 'mobile' | 'desktop';
 
+const TIKTOK_URL = 'https://www.tiktok.com/@baltozaur.ro';
+
 interface Props {
   lastUpdated: Date | null;
   refreshing: boolean;
@@ -105,6 +107,19 @@ export function DashboardHeader({
           <span className="text-slate-500">{lakeCount} {tr.lakes}</span>
           <span className="text-slate-600">·</span>
           <span className="text-slate-500">{tr.updated} <span className="text-slate-300">{timeStr}</span></span>
+          <a
+            href={TIKTOK_URL}
+            target="_blank"
+            rel="noreferrer"
+            aria-label="Urmărește update-urile Baltozaur pe TikTok"
+            className="ml-auto inline-flex shrink-0 items-center gap-1.5 rounded-full border border-cyan-300/25 bg-gradient-to-r from-cyan-400/15 to-fuchsia-400/15 px-2.5 py-1 font-semibold text-white transition-all hover:border-cyan-300/50 hover:from-cyan-400/25 hover:to-fuchsia-400/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 sm:px-3"
+          >
+            <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M16.6 5.8c1.1 1.2 2.4 1.9 4 2v3.2c-1.6-.1-3-.6-4.2-1.5v5.8c0 3.1-2.4 5.5-5.6 5.5-3 0-5.4-2.2-5.4-5.1 0-3 2.4-5.2 5.5-5.2.4 0 .8 0 1.2.1V14c-.4-.1-.8-.2-1.2-.2-1.2 0-2.1.8-2.1 1.9s.9 1.9 2 1.9c1.3 0 2.2-.9 2.2-2.4V3.2h3.6v2.6Z" />
+            </svg>
+            <span className="sm:hidden">Update-uri</span>
+            <span className="hidden sm:inline">Update-uri pe TikTok</span>
+          </a>
         </div>
       </div>
     </header>
