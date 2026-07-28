@@ -111,9 +111,37 @@ It calls the production `calculate-scores` Edge Function at minute 0 every 3 hou
 
 1. Work on `dev`.
 2. Test the Vercel preview with `VITE_APP_ENV=dev`.
-3. Test Edge Function changes with small limits, for example `calculate-scores?limit=1`.
-4. Merge `dev` into `main`.
-5. Vercel deploys `main` to `baltozaur.ro` with `VITE_APP_ENV=prod`.
+3. From Admin > Backup, press **Backup acum** and wait for the `Database backup` workflow to succeed.
+4. Test Edge Function changes with small limits, for example `calculate-scores?limit=1`.
+5. Merge `dev` into `main`.
+6. Vercel deploys `main` to `baltozaur.ro` with `VITE_APP_ENV=prod`.
+
+## Immutable Database Backups
+
+`.github/workflows/database-backup.yml` checks daily and creates a backup when the latest
+successful copy is at least 30 days old. A manual run, including **Admin > Backup > Backup
+acum**, bypasses that age check. Each backup contains roles, schema, and data, is checksummed,
+and is uploaded without overwriting older copies.
+
+The backup bucket is `baltozaur-db-backups-20260727-9f4c2e` in `eu-north-1`, with
+**Versioning**, **Object Lock**, and a default 90-day Compliance retention enabled.
+GitHub Actions authenticates to AWS through OIDC using the narrowly scoped
+`BaltozaurDatabaseBackup` IAM role; no permanent AWS keys are used.
+
+The workflow reuses the existing `SUPABASE_ACCESS_TOKEN`, `SUPABASE_DB_PASSWORD`, and
+`SUPABASE_PROJECT_REF` repository secrets already configured for the Supabase deployment
+pipeline. No additional database secret is required.
+
+Configure these Supabase Edge Function secrets for the admin button:
+
+| Secret | Value |
+| --- | --- |
+| `GITHUB_BACKUP_REPOSITORY` | Repository in `owner/repository` format |
+| `GITHUB_BACKUP_TOKEN` | Fine-grained GitHub token restricted to this repository, with Actions write access |
+
+Deploy `trigger-database-backup` through the normal `main` Supabase pipeline. Never expose
+these values as `VITE_*` variables. Run the workflow once manually and perform a test restore
+before relying on it for releases.
 
 ## Secrets
 

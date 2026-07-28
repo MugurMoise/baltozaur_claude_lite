@@ -88,13 +88,14 @@ interface AdminLake {
   created_at: string | null;
 }
 
-type Tab = 'analytics' | 'refresh' | 'settings' | 'quick-add' | 'lakes' | 'suggestions';
+type Tab = 'analytics' | 'backup' | 'refresh' | 'settings' | 'quick-add' | 'lakes' | 'suggestions';
 type Filter = 'pending' | 'all';
 
 const SETTINGS_ID = 'default';
 
 function initialAdminTab(pathname: string): Tab {
   if (pathname.startsWith('/admin/analytics')) return 'analytics';
+  if (pathname.startsWith('/admin/backup')) return 'backup';
   if (pathname.startsWith('/admin/lakes')) return 'lakes';
   if (pathname.startsWith('/admin/suggestions')) return 'suggestions';
   return 'refresh';
@@ -288,6 +289,7 @@ export function AdminSuggestionsPage() {
   const [filter, setFilter] = useState<Filter>('pending');
   const [tab, setTab] = useState<Tab>(() => initialAdminTab(window.location.pathname));
   const [refreshingScores, setRefreshingScores] = useState(false);
+  const [startingBackup, setStartingBackup] = useState(false);
   const [refreshLimit, setRefreshLimit] = useState('10');
   const [settings, setSettings] = useState<ScoreSettings>(DEFAULT_SCORE_SETTINGS);
   const [savingSettings, setSavingSettings] = useState(false);
@@ -320,11 +322,19 @@ export function AdminSuggestionsPage() {
       window.history.replaceState(null, '', '/admin/analytics');
       return;
     }
+    if (nextTab === 'backup') {
+      window.history.replaceState(null, '', '/admin/backup');
+      return;
+    }
     if (nextTab === 'lakes') {
       window.history.replaceState(null, '', '/admin/lakes');
       return;
     }
-    if (window.location.pathname.startsWith('/admin/lakes') || window.location.pathname.startsWith('/admin/analytics')) {
+    if (
+      window.location.pathname.startsWith('/admin/lakes')
+      || window.location.pathname.startsWith('/admin/analytics')
+      || window.location.pathname.startsWith('/admin/backup')
+    ) {
       window.history.replaceState(null, '', '/admin');
     }
   }
@@ -480,6 +490,30 @@ export function AdminSuggestionsPage() {
       ? (data as any).results.filter((row: { error?: string }) => row.error).length
       : 0;
     setMessage(`Refresh terminat pentru ${processed} balti${failed ? `, cu ${failed} erori` : ''}.`);
+  }
+
+  async function startBackup() {
+    if (!supabase) return;
+    if (!window.confirm('Pornesti un backup complet al bazei de date inainte de release?')) return;
+
+    setStartingBackup(true);
+    setMessage(null);
+    const { data, error } = await supabase.functions.invoke('trigger-database-backup', {
+      body: { source: 'admin-before-release' },
+    });
+    setStartingBackup(false);
+
+    if (error) {
+      setMessage(`Backupul nu a putut fi pornit: ${error.message}`);
+      return;
+    }
+
+    const workflowUrl = data && typeof data === 'object' && 'workflow_url' in data
+      ? String(data.workflow_url)
+      : null;
+    setMessage(workflowUrl
+      ? `Backup pornit. Urmareste executia aici: ${workflowUrl}`
+      : 'Backup pornit. Vei putea verifica rezultatul in GitHub Actions.');
   }
 
   async function saveSettings(event: FormEvent) {
@@ -650,6 +684,7 @@ export function AdminSuggestionsPage() {
           <div className="flex flex-wrap items-center gap-2">
             {([
               ['analytics', 'Analytics'],
+              ['backup', 'Backup'],
               ['refresh', 'Refresh'],
               ['settings', 'Ecuatie'],
               ['quick-add', 'Adauga balta'],
@@ -681,6 +716,37 @@ export function AdminSuggestionsPage() {
 
         {tab === 'analytics' && <AdminAnalyticsPanel environment={appEnv} />}
 
+        {tab === 'backup' && (
+          <section className="mt-5 grid gap-4 lg:grid-cols-[1fr_320px]">
+            <div className="rounded-lg border border-white/10 bg-white/[0.04] p-5">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-lime-300">Inainte de release</p>
+              <h2 className="mt-2 text-xl font-semibold">Backup baza de date</h2>
+              <p className="mt-2 max-w-2xl text-sm text-slate-400">
+                Creeaza un dump complet, il verifica si il incarca in spatiul S3 protejat impotriva
+                modificarii sau stergerii. Procesul ruleaza separat, fara sa blocheze aplicatia.
+              </p>
+
+              <button
+                type="button"
+                onClick={() => void startBackup()}
+                disabled={startingBackup}
+                className="mt-5 h-11 rounded-lg bg-lime-300 px-5 text-sm font-semibold text-mud-900 hover:bg-lime-200 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {startingBackup ? 'Se porneste...' : 'Backup acum'}
+              </button>
+            </div>
+
+            <aside className="rounded-lg border border-white/10 bg-white/[0.04] p-5">
+              <h3 className="font-semibold">Politica de backup</h3>
+              <ul className="mt-3 space-y-2 text-sm text-slate-400">
+                <li>Automat: la fiecare 30 de zile</li>
+                <li>Manual: inainte de fiecare release</li>
+                <li>Retentie immutable: 90 de zile</li>
+                <li>Copiile existente nu sunt suprascrise</li>
+              </ul>
+            </aside>
+          </section>
+        )}
         {tab === 'refresh' && (
           <section className="mt-5 grid gap-4 lg:grid-cols-[1fr_320px]">
             <div className="rounded-lg border border-white/10 bg-white/[0.04] p-5">

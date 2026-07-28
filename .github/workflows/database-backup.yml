@@ -1,0 +1,141 @@
+name: Database backup
+
+on:
+  schedule:
+    # The daily check creates a backup only when the latest successful one is at least 30 days old.
+    - cron: '17 2 * * *'
+  workflow_dispatch:
+    inputs:
+      force:
+        description: Create a backup even if the latest one is newer than 30 days
+        type: boolean
+        default: true
+      source:
+        description: Reason for the backup
+        type: string
+        default: manual
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: database-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+      AWS_BACKUP_BUCKET: baltozaur-db-backups-20260727-9f4c2e
+      AWS_BACKUP_REGION: eu-north-1
+      BACKUP_PREFIX: database
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::061687825271:role/BaltozaurDatabaseBackup
+          aws-region: eu-north-1
+
+      - name: Validate configuration
+        shell: bash
+        run: |
+          test -n "$SUPABASE_ACCESS_TOKEN"
+          test -n "$SUPABASE_DB_PASSWORD"
+          test -n "$SUPABASE_PROJECT_REF"
+          test -n "$AWS_BACKUP_BUCKET"
+          test -n "$AWS_BACKUP_REGION"
+
+      - name: Check whether the 30-day backup is due
+        id: due
+        shell: bash
+        env:
+          FORCE_BACKUP: ${{ inputs.force || 'false' }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ] && [ "$FORCE_BACKUP" = "true" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          latest="$(aws s3api list-objects-v2 \
+            --bucket "$AWS_BACKUP_BUCKET" \
+            --prefix "$BACKUP_PREFIX/" \
+            --query 'sort_by(Contents,&LastModified)[-1].LastModified' \
+            --output text)"
+
+          if [ -z "$latest" ] || [ "$latest" = "None" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          latest_epoch="$(date -d "$latest" +%s)"
+          now_epoch="$(date +%s)"
+          age_seconds="$((now_epoch - latest_epoch))"
+          if [ "$age_seconds" -ge 2592000 ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "Latest backup is less than 30 days old; nothing to do."
+          fi
+
+      - name: Set up Supabase CLI
+        if: steps.due.outputs.run == 'true'
+        uses: supabase/setup-cli@v2
+        with:
+          version: 2.98.2
+
+      - name: Link Supabase project
+        if: steps.due.outputs.run == 'true'
+        shell: bash
+        run: supabase --dns-resolver https link --project-ref "$SUPABASE_PROJECT_REF" --password "$SUPABASE_DB_PASSWORD"
+
+      - name: Create and verify logical backup
+        if: steps.due.outputs.run == 'true'
+        shell: bash
+        run: |
+          mkdir -p backup-output
+          supabase db dump --linked -f backup-output/roles.sql --role-only
+          supabase db dump --linked -f backup-output/schema.sql
+          supabase db dump --linked -f backup-output/data.sql --use-copy --data-only
+          test -s backup-output/schema.sql
+          test -s backup-output/data.sql
+
+          timestamp="$(date -u +'%Y-%m-%dT%H-%M-%SZ')"
+          archive="baltozaur-db-${timestamp}.tar.gz"
+          tar -C backup-output -czf "$archive" roles.sql schema.sql data.sql
+          tar -tzf "$archive"
+          test -s "$archive"
+          sha256sum "$archive" > "${archive}.sha256"
+          echo "archive=$archive" >> "$GITHUB_ENV"
+
+      - name: Upload immutable backup
+        if: steps.due.outputs.run == 'true'
+        shell: bash
+        run: |
+          retain_until="$(date -u -d '+90 days' +'%Y-%m-%dT%H:%M:%SZ')"
+          destination="s3://${AWS_BACKUP_BUCKET}/${BACKUP_PREFIX}/${archive}"
+
+          aws s3 cp "$archive" "$destination" \
+            --sse AES256 \
+            --object-lock-mode COMPLIANCE \
+            --object-lock-retain-until-date "$retain_until"
+          aws s3 cp "${archive}.sha256" "${destination}.sha256" \
+            --sse AES256 \
+            --object-lock-mode COMPLIANCE \
+            --object-lock-retain-until-date "$retain_until"
+
+          size="$(aws s3api head-object \
+            --bucket "$AWS_BACKUP_BUCKET" \
+            --key "${BACKUP_PREFIX}/${archive}" \
+            --query ContentLength \
+            --output text)"
+          test "$size" -gt 0
+          echo "Backup verified: ${destination} (${size} bytes), immutable until ${retain_until}" >> "$GITHUB_STEP_SUMMARY"
