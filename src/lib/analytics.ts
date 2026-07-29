@@ -1,109 +1,80 @@
-import { appEnv, supabase } from './supabase';
-
 type AnalyticsValue = string | number | boolean | null;
 type AnalyticsMetadata = Record<string, AnalyticsValue>;
 
-interface Acquisition {
-  source: string;
-  medium: string;
-  campaign: string | null;
-  referrerDomain: string | null;
+interface AnalyticsCount {
+  metric: 'page_view' | 'source' | 'platform' | 'action' | 'lake_interest';
+  bucket: string;
+  count: number;
 }
 
-interface VisitorContext {
-  country: string | null;
-  region: string | null;
-  city: string | null;
-  excluded: boolean;
-}
+const FLUSH_DELAY_MS = 8_000;
+const RETRY_DELAY_MS = 15_000;
+const MAX_BATCH_BUCKETS = 40;
+const trackedActions = new Set([
+  'lake_details_opened',
+  'shared_lake_opened',
+  'navigation_clicked',
+  'share_link_copied',
+  'website_clicked',
+  'phone_clicked',
+  'search_used',
+  'filter_changed',
+  'map_opened',
+  'location_requested',
+  'location_granted',
+  'location_denied',
+  'data_refreshed',
+  'forecast_day_selected',
+  'language_changed',
+  'list_opened',
+  'view_mode_changed',
+]);
+const lakeActions = new Set([
+  'lake_details_opened',
+  'shared_lake_opened',
+  'navigation_clicked',
+  'share_link_copied',
+  'website_clicked',
+  'phone_clicked',
+]);
+const pendingCounts = new Map<string, AnalyticsCount>();
+const acquisitionSource = detectAcquisitionSource();
+const platform = detectPlatform();
+let flushTimer: ReturnType<typeof setTimeout> | null = null;
+let flushPromise: Promise<void> | null = null;
 
-const MAX_METADATA_FIELDS = 12;
-const MAX_METADATA_STRING_LENGTH = 160;
-const sessionId = createSessionId();
-const acquisition = detectAcquisition();
-const landingPath = safePath(window.location.pathname);
-let visitorContextPromise: Promise<VisitorContext> | null = null;
-
-function createSessionId() {
-  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
-    return crypto.randomUUID();
-  }
-
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (character) => {
-    const random = Math.floor(Math.random() * 16);
-    const value = character === 'x' ? random : (random & 0x3) | 0x8;
-    return value.toString(16);
-  });
-}
-
-function safePath(value: string) {
-  const path = value.startsWith('/') ? value : `/${value}`;
-  return path.slice(0, 160);
-}
-
-function normaliseSource(value: string) {
-  const source = value.trim().toLowerCase().replace(/[^a-z0-9._-]+/g, '_');
+function knownSource(value: string | null) {
+  const source = value?.trim().toLowerCase() ?? '';
   if (source.includes('tiktok')) return 'tiktok';
   if (source.includes('instagram')) return 'instagram';
   if (source.includes('facebook') || source === 'fb') return 'facebook';
   if (source.includes('google')) return 'google';
-  if (source.includes('youtube')) return 'youtube';
-  return source.slice(0, 80) || 'direct';
+  if (source.includes('youtube') || source.includes('youtu.be')) return 'youtube';
+  if (source.includes('bing')) return 'bing';
+  return source ? 'other' : 'direct';
 }
 
-function hostnameFromReferrer() {
-  if (!document.referrer) return null;
-  try {
-    const hostname = new URL(document.referrer).hostname.replace(/^www\./, '').toLowerCase();
-    return hostname === window.location.hostname.replace(/^www\./, '').toLowerCase() ? null : hostname.slice(0, 120);
-  } catch {
-    return null;
-  }
-}
-
-function detectAcquisition(): Acquisition {
+function detectAcquisitionSource() {
   const params = new URLSearchParams(window.location.search);
-  const userAgent = navigator.userAgent.toLowerCase();
   const utmSource = params.get('utm_source');
-  const utmMedium = params.get('utm_medium');
-  const campaign = params.get('utm_campaign')?.slice(0, 120) || null;
-  const referrerDomain = hostnameFromReferrer();
+  if (utmSource) return knownSource(utmSource);
+  if (params.has('ttclid')) return 'tiktok';
+  if (params.has('fbclid')) return 'facebook';
+  if (params.has('gclid')) return 'google';
 
-  if (utmSource) {
-    return {
-      source: normaliseSource(utmSource),
-      medium: (utmMedium?.trim().toLowerCase() || 'campaign').slice(0, 80),
-      campaign,
-      referrerDomain,
-    };
-  }
+  const userAgent = navigator.userAgent.toLowerCase();
+  if (/tiktok|musical_ly|bytedancewebview/.test(userAgent)) return 'tiktok';
+  if (/instagram/.test(userAgent)) return 'instagram';
+  if (/(fban|fbav)/.test(userAgent)) return 'facebook';
 
-  if (params.has('ttclid')) return { source: 'tiktok', medium: 'paid_social', campaign, referrerDomain };
-  if (params.has('fbclid')) return { source: 'facebook', medium: 'paid_social', campaign, referrerDomain };
-  if (params.has('gclid')) return { source: 'google', medium: 'paid_search', campaign, referrerDomain };
-  if (/tiktok|musical_ly|bytedancewebview/.test(userAgent)) {
-    return { source: 'tiktok', medium: 'in_app_social', campaign, referrerDomain };
+  if (!document.referrer) return 'direct';
+  try {
+    const referrer = new URL(document.referrer);
+    if (referrer.hostname === window.location.hostname) return 'direct';
+    return knownSource(referrer.hostname);
+  } catch {
+    return 'other';
   }
-  if (/instagram/.test(userAgent)) {
-    return { source: 'instagram', medium: 'in_app_social', campaign, referrerDomain };
-  }
-  if (/(fban|fbav)/.test(userAgent)) {
-    return { source: 'facebook', medium: 'in_app_social', campaign, referrerDomain };
-  }
-
-  if (!referrerDomain) return { source: 'direct', medium: 'none', campaign, referrerDomain: null };
-  if (referrerDomain.includes('tiktok')) return { source: 'tiktok', medium: 'organic_social', campaign, referrerDomain };
-  if (referrerDomain.includes('instagram')) return { source: 'instagram', medium: 'organic_social', campaign, referrerDomain };
-  if (referrerDomain.includes('facebook') || referrerDomain === 'l.facebook.com') {
-    return { source: 'facebook', medium: 'organic_social', campaign, referrerDomain };
-  }
-  if (referrerDomain.includes('youtube') || referrerDomain === 'youtu.be') {
-    return { source: 'youtube', medium: 'organic_social', campaign, referrerDomain };
-  }
-  if (referrerDomain.includes('google.')) return { source: 'google', medium: 'organic_search', campaign, referrerDomain };
-  if (referrerDomain.includes('bing.')) return { source: 'bing', medium: 'organic_search', campaign, referrerDomain };
-
-  return { source: referrerDomain, medium: 'referral', campaign, referrerDomain };
 }
 
 function detectPlatform() {
@@ -116,92 +87,104 @@ function detectPlatform() {
   return 'web';
 }
 
-function detectDeviceType() {
-  const userAgent = navigator.userAgent.toLowerCase();
-  if (/ipad|tablet|playbook|silk/.test(userAgent)) return 'tablet';
-  if (/android/.test(userAgent) && !/mobile/.test(userAgent)) return 'tablet';
-  if (/mobi|iphone|ipod|android/.test(userAgent)) return 'mobile';
-  return 'desktop';
+function scheduleFlush(delay = FLUSH_DELAY_MS) {
+  if (flushTimer) return;
+  flushTimer = setTimeout(() => {
+    flushTimer = null;
+    void flushAnalytics();
+  }, delay);
 }
 
-async function loadVisitorContext(): Promise<VisitorContext> {
-  try {
-    const response = await fetch('/api/visitor-context', {
-      headers: { Accept: 'application/json' },
-      cache: 'no-store',
-    });
-    if (!response.ok || !response.headers.get('content-type')?.includes('application/json')) {
-      return { country: null, region: null, city: null, excluded: false };
-    }
+function addCount(metric: AnalyticsCount['metric'], bucket: string, count = 1) {
+  const cleanBucket = bucket.trim().replace(/[\u0000-\u001f\u007f]/g, '').slice(0, 120);
+  if (!cleanBucket) return;
 
-    const raw = await response.json() as Partial<VisitorContext>;
-    return {
-      country: typeof raw.country === 'string' ? raw.country.slice(0, 2).toUpperCase() : null,
-      region: typeof raw.region === 'string' ? raw.region.slice(0, 80) : null,
-      city: typeof raw.city === 'string' ? raw.city.slice(0, 120) : null,
-      excluded: raw.excluded === true,
-    };
-  } catch {
-    return { country: null, region: null, city: null, excluded: false };
+  const key = `${metric}\u0000${cleanBucket}`;
+  const current = pendingCounts.get(key);
+  if (current) {
+    current.count = Math.min(1000, current.count + count);
+  } else {
+    pendingCounts.set(key, { metric, bucket: cleanBucket, count });
+  }
+
+  if (pendingCounts.size >= MAX_BATCH_BUCKETS) {
+    void flushAnalytics();
+  } else {
+    scheduleFlush();
   }
 }
 
-function getVisitorContext() {
-  visitorContextPromise ??= loadVisitorContext();
-  return visitorContextPromise;
+function restoreCounts(counts: AnalyticsCount[]) {
+  for (const count of counts) {
+    addCount(count.metric, count.bucket, count.count);
+  }
 }
 
-function cleanMetadata(metadata: AnalyticsMetadata): AnalyticsMetadata {
-  return Object.fromEntries(
-    Object.entries(metadata)
-      .slice(0, MAX_METADATA_FIELDS)
-      .map(([key, value]) => [
-        key.replace(/[^a-z0-9_]/gi, '_').slice(0, 40),
-        typeof value === 'string' ? value.slice(0, MAX_METADATA_STRING_LENGTH) : value,
-      ])
-  );
+async function sendBatch(counts: AnalyticsCount[], keepalive: boolean) {
+  const response = await fetch('/api/analytics', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ counts }),
+    keepalive,
+  });
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+}
+
+export function flushAnalytics(keepalive = false) {
+  if (flushPromise || pendingCounts.size === 0) return flushPromise ?? Promise.resolve();
+
+  if (flushTimer) {
+    clearTimeout(flushTimer);
+    flushTimer = null;
+  }
+
+  const batch = Array.from(pendingCounts.values()).slice(0, MAX_BATCH_BUCKETS);
+  for (const count of batch) {
+    pendingCounts.delete(`${count.metric}\u0000${count.bucket}`);
+  }
+
+  flushPromise = sendBatch(batch, keepalive)
+    .catch((error: unknown) => {
+      restoreCounts(batch);
+      scheduleFlush(RETRY_DELAY_MS);
+      if (import.meta.env.DEV) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.warn('[Baltozaur] analytics batch was not recorded:', message);
+      }
+    })
+    .finally(() => {
+      flushPromise = null;
+      if (pendingCounts.size > 0 && !flushTimer) scheduleFlush();
+    });
+
+  return flushPromise;
 }
 
 export function trackEvent(eventName: string, metadata: AnalyticsMetadata = {}) {
-  const analyticsClient = supabase;
-  if (!analyticsClient || window.location.pathname.startsWith('/admin')) return;
+  if (window.location.pathname.startsWith('/admin')) return;
 
-  const name = eventName.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_').slice(0, 64);
-  if (!name) return;
+  const action = eventName.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_').slice(0, 64);
+  if (!trackedActions.has(action)) return;
 
-  void getVisitorContext().then(async (visitorContext) => {
-    if (visitorContext.excluded) return;
-
-    const { error } = await analyticsClient.rpc('track_analytics_event', {
-      p_event_name: name,
-      p_session_id: sessionId,
-      p_app_environment: appEnv,
-      p_source: acquisition.source,
-      p_medium: acquisition.medium,
-      p_campaign: acquisition.campaign,
-      p_referrer_domain: acquisition.referrerDomain,
-      p_landing_path: landingPath,
-      p_page_path: safePath(window.location.pathname),
-      p_platform: detectPlatform(),
-      p_device_type: detectDeviceType(),
-      p_language: navigator.language.slice(0, 16),
-      p_metadata: cleanMetadata({
-        geo_country: visitorContext.country,
-        geo_region: visitorContext.region,
-        geo_city: visitorContext.city,
-        ...metadata,
-      }),
-    });
-
-    if (error && import.meta.env.DEV) {
-      console.warn('[Baltozaur] analytics event was not recorded:', error.message);
-    }
-  });
+  addCount('action', action);
+  const lakeName = metadata.lake_name;
+  if (lakeActions.has(action) && typeof lakeName === 'string') {
+    addCount('lake_interest', lakeName);
+  }
 }
 
 export function trackPageView() {
-  trackEvent('page_view', {
-    viewport_width: window.innerWidth,
-    viewport_height: window.innerHeight,
+  if (window.location.pathname.startsWith('/admin')) return;
+  addCount('page_view', 'all');
+  addCount('source', acquisitionSource);
+  addCount('platform', platform);
+}
+
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') void flushAnalytics(true);
+  });
+  window.addEventListener('pagehide', () => {
+    void flushAnalytics(true);
   });
 }
