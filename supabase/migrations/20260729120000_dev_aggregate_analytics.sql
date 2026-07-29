@@ -1,3 +1,4 @@
+-- Privacy-first dev analytics: only daily counters, never visitor-level rows.
 create table if not exists public.dev_analytics_daily_counts (
   day          date not null default current_date,
   metric       text not null,
