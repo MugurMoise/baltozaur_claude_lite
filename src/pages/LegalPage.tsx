@@ -29,13 +29,12 @@ export function LegalPage() {
         <section className="rounded-2xl border border-lake-500/20 bg-lake-900/20 p-5">
           <h2 className="font-display text-2xl tracking-wide text-white">Despre proiect</h2>
           <p className="mt-3">
-            Baltozaur este administrat în România de o persoană fizică, drept proiect personal,
-            gratuit și necomercial. Nu vinde produse sau servicii, nu afișează publicitate și nu
-            urmărește obținerea de profit.
+            Baltozaur este administrat de Moise Mugurel-Gabriel, persoană fizică din România, drept
+            proiect personal, gratuit și necomercial. Nu vinde produse sau servicii, nu afișează
+            publicitate și nu urmărește obținerea de profit.
           </p>
           <p className="mt-3">
-            Pentru întrebări, exercitarea drepturilor sau solicitarea datelor complete de
-            identificare ale administratorului: {' '}
+            Pentru întrebări sau exercitarea drepturilor: {' '}
             <a className="text-lake-300 underline hover:text-lake-200" href="mailto:contact@baltozaur.ro">
               contact@baltozaur.ro
             </a>.
