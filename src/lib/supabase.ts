@@ -19,7 +19,6 @@ export const tables = {
   socialPosts: `${envTablePrefix}social_posts`,
   socialPostAnalysis: `${envTablePrefix}social_post_analysis`,
   lakeSuggestions: `${envTablePrefix}lake_suggestions`,
-  analyticsExcludedIps: `${envTablePrefix}analytics_excluded_ips`,
 } as const;
 
 export const supabase =
