@@ -3,6 +3,7 @@ import { isDevEnvironment, supabase } from '../../lib/supabase';
 import { FormField } from './FormField';
 import { SubmitButton } from './SubmitButton';
 import { Toast } from './Toast';
+import { LegalFooter } from '../LegalFooter';
 
 interface FormState {
   name: string;
@@ -11,8 +12,6 @@ interface FormState {
   lon: string;
   website_url: string;
   facebook_url: string;
-  phone: string;
-  submitter_email: string;
   notes: string;
 }
 
@@ -23,14 +22,13 @@ const initialState: FormState = {
   lon: '',
   website_url: '',
   facebook_url: '',
-  phone: '',
-  submitter_email: '',
   notes: '',
 };
 
 export function AddLakeForm() {
   const [form, setForm] = useState<FormState>(initialState);
   const [loading, setLoading] = useState(false);
+  const [legalAccepted, setLegalAccepted] = useState(false);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   const updateField = (field: keyof FormState, value: string) => {
@@ -65,8 +63,6 @@ export function AddLakeForm() {
         lon,
         website_url: form.website_url.trim() || null,
         facebook_url: form.facebook_url.trim() || null,
-        phone: form.phone.trim() || null,
-        submitter_email: form.submitter_email.trim() || null,
         notes: form.notes.trim() || null,
       },
     });
@@ -82,12 +78,13 @@ export function AddLakeForm() {
     }
 
     setForm(initialState);
+    setLegalAccepted(false);
     setToast({ type: 'success', message: 'Multumim. Sugestia a fost trimisa pentru verificare.' });
   };
 
   return (
-    <main className="min-h-screen bg-mud-900 text-white font-body px-4 py-6">
-      <form onSubmit={submit} className="max-w-xl mx-auto space-y-4">
+    <main className="min-h-screen bg-mud-900 text-white font-body pt-6">
+      <form onSubmit={submit} className="max-w-xl mx-auto space-y-4 px-4">
         <div>
           <a href="/" className="text-sm text-slate-500 hover:text-white">← Baltozaur</a>
           <h1 className="font-display text-3xl tracking-wide mt-2">Sugereaza o balta</h1>
@@ -104,8 +101,6 @@ export function AddLakeForm() {
         </div>
         <FormField label="Site" props={{ value: form.website_url, onChange: (event) => updateField('website_url', event.target.value), placeholder: 'https://...' }} />
         <FormField label="Facebook" props={{ value: form.facebook_url, onChange: (event) => updateField('facebook_url', event.target.value), placeholder: 'https://facebook.com/...' }} />
-        <FormField label="Telefon" props={{ value: form.phone, onChange: (event) => updateField('phone', event.target.value) }} />
-        <FormField label="Email pentru confirmare" props={{ value: form.submitter_email, onChange: (event) => updateField('submitter_email', event.target.value), type: 'email', placeholder: 'nume@email.ro' }} />
         <FormField
           as="textarea"
           label="Observatii"
@@ -115,9 +110,24 @@ export function AddLakeForm() {
             placeholder: 'Ex: program, taxa, regulile baltii, link Google Maps...',
           }}
         />
-        <p className="text-xs leading-relaxed text-slate-500">
-          Pentru prevenirea abuzului salvam IP-ul si informatii tehnice ale browserului impreuna cu sugestia.
+        <p className="text-xs leading-relaxed text-slate-400">
+          Nu introduce nume, email, telefon sau alte date personale. Nu salvăm IP-ul ori informațiile
+          browserului împreună cu sugestia.
         </p>
+        <label className="flex items-start gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-3 text-xs leading-relaxed text-slate-300">
+          <input
+            type="checkbox"
+            required
+            checked={legalAccepted}
+            onChange={(event) => setLegalAccepted(event.target.checked)}
+            className="mt-1"
+          />
+          <span>
+            Confirm că sugestia nu conține date personale și accept că informațiile despre baltă
+            pot fi verificate, corectate și publicate conform{' '}
+            <a href="/legal#termeni" className="text-lake-300 underline">termenilor</a>.
+          </span>
+        </label>
         <SubmitButton loading={loading} label="Trimite sugestia" loadingLabel="Se trimite..." />
       </form>
 
@@ -128,6 +138,9 @@ export function AddLakeForm() {
           onClose={() => setToast(null)}
         />
       )}
+      <div className="mt-10">
+        <LegalFooter />
+      </div>
     </main>
   );
 }

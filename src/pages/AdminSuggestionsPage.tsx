@@ -11,11 +11,6 @@ interface LakeSuggestion {
   lon: number | null;
   website_url: string | null;
   facebook_url: string | null;
-  phone: string | null;
-  submitter_email: string | null;
-  submitter_ip: string | null;
-  user_agent: string | null;
-  confirmation_sent_at: string | null;
   notes: string | null;
   status: 'pending' | 'approved' | 'rejected' | string;
   created_at: string;
@@ -398,7 +393,7 @@ export function AdminSuggestionsPage() {
     setMessage(null);
     const { data, error } = await supabase
       .from(tables.lakeSuggestions)
-      .select('*')
+      .select('id, name, county, lat, lon, website_url, facebook_url, notes, status, created_at')
       .order('created_at', { ascending: false });
     setLoading(false);
 
@@ -1063,13 +1058,8 @@ export function AdminSuggestionsPage() {
                   </div>
 
                   <dl className="mt-4 grid gap-2 text-sm text-slate-300 sm:grid-cols-2">
-                    {suggestion.phone && <div><dt className="text-slate-500">Telefon</dt><dd>{suggestion.phone}</dd></div>}
-                    {suggestion.submitter_email && <div><dt className="text-slate-500">Email</dt><dd>{suggestion.submitter_email}</dd></div>}
-                    {suggestion.submitter_ip && <div><dt className="text-slate-500">IP</dt><dd>{suggestion.submitter_ip}</dd></div>}
-                    {suggestion.confirmation_sent_at && <div><dt className="text-slate-500">Confirmare</dt><dd>{formatDate(suggestion.confirmation_sent_at)}</dd></div>}
                     {suggestion.website_url && <div><dt className="text-slate-500">Site</dt><dd><a className="text-lime-200 hover:text-lime-100" href={suggestion.website_url} target="_blank" rel="noreferrer">{shortUrl(suggestion.website_url)}</a></dd></div>}
                     {suggestion.facebook_url && <div><dt className="text-slate-500">Facebook</dt><dd><a className="text-lime-200 hover:text-lime-100" href={suggestion.facebook_url} target="_blank" rel="noreferrer">{shortUrl(suggestion.facebook_url)}</a></dd></div>}
-                    {suggestion.user_agent && <div className="sm:col-span-2"><dt className="text-slate-500">Browser</dt><dd className="break-words text-xs">{suggestion.user_agent}</dd></div>}
                     {suggestion.notes && <div className="sm:col-span-2"><dt className="text-slate-500">Observatii</dt><dd className="whitespace-pre-wrap">{suggestion.notes}</dd></div>}
                   </dl>
                 </article>

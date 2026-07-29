@@ -13,7 +13,7 @@
 
   body {
     @apply bg-mud-900 text-white;
-    font-family: 'DM Sans', sans-serif;
+    font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
@@ -48,7 +48,7 @@
 
 .leaflet-container {
   background: #0a0d0f !important;
-  font-family: 'DM Sans', sans-serif !important;
+  font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
 }
 
 /* Animate cards staggered */

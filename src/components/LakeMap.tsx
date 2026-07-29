@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { LakeScore } from '../types/lake';
 import { getScoreColor, getScoreLabel } from '../types/lake';
 
@@ -7,12 +7,15 @@ interface Props {
   variant?: 'mobile' | 'desktop';
 }
 
+let externalMapAllowedForSession = false;
+
 export function LakeMap({ lakes, variant = 'mobile' }: Props) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<import('leaflet').Map | null>(null);
+  const [externalMapAllowed, setExternalMapAllowed] = useState(externalMapAllowedForSession);
 
   useEffect(() => {
-    if (!mapRef.current || mapInstanceRef.current) return;
+    if (!externalMapAllowed || !mapRef.current || mapInstanceRef.current) return;
 
     let L: typeof import('leaflet');
     import('leaflet').then((leaflet) => {
@@ -51,7 +54,7 @@ export function LakeMap({ lakes, variant = 'mobile' }: Props) {
               box-shadow: 0 0 12px ${color}66;
               position: relative;
             ">
-              <span style="color: ${color}; font-size: 11px; font-weight: 700; font-family: 'JetBrains Mono', monospace;">
+              <span style="color: ${color}; font-size: 11px; font-weight: 700; font-family: monospace;">
                 ${Math.round(lake.score)}
               </span>
               <div style="
@@ -70,10 +73,10 @@ export function LakeMap({ lakes, variant = 'mobile' }: Props) {
         }).setContent(`
           <div style="
             background: #0f1419; border: 1px solid #ffffff15;
-            border-radius: 12px; padding: 12px; font-family: 'DM Sans', sans-serif;
+            border-radius: 12px; padding: 12px; font-family: sans-serif;
             color: white; min-width: 200px;
           ">
-            <div style="font-family: 'Bebas Neue', cursive; font-size: 18px; letter-spacing: 1px; margin-bottom: 4px;">
+            <div style="font-family: Impact, sans-serif; font-size: 18px; letter-spacing: 1px; margin-bottom: 4px;">
               ${lake.name}
             </div>
             <div style="font-size: 11px; color: #64748b; margin-bottom: 10px;">
@@ -84,27 +87,27 @@ export function LakeMap({ lakes, variant = 'mobile' }: Props) {
               background: ${color}20; border: 1px solid ${color}40;
               border-radius: 20px; padding: 2px 10px; margin-bottom: 10px;
             ">
-              <span style="color: ${color}; font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 700;">${Math.round(lake.score)}</span>
+              <span style="color: ${color}; font-family: monospace; font-size: 13px; font-weight: 700;">${Math.round(lake.score)}</span>
               <span style="color: ${color}; font-size: 11px;">${label}</span>
             </div>
             <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 10px;">
               <div>
                 <div style="font-size: 9px; color: #475569; text-transform: uppercase; letter-spacing: 1px;">Temp</div>
-                <div style="font-size: 12px; font-family: 'JetBrains Mono', monospace;">${lake.temperature}°C</div>
+                <div style="font-size: 12px; font-family: monospace;">${lake.temperature}°C</div>
               </div>
               <div>
                 <div style="font-size: 9px; color: #475569; text-transform: uppercase; letter-spacing: 1px;">Press</div>
-                <div style="font-size: 12px; font-family: 'JetBrains Mono', monospace;">${lake.pressure}</div>
+                <div style="font-size: 12px; font-family: monospace;">${lake.pressure}</div>
               </div>
               <div>
                 <div style="font-size: 9px; color: #475569; text-transform: uppercase; letter-spacing: 1px;">Wind</div>
-                <div style="font-size: 12px; font-family: 'JetBrains Mono', monospace;">${lake.wind_speed}km/h</div>
+                <div style="font-size: 12px; font-family: monospace;">${lake.wind_speed}km/h</div>
               </div>
             </div>
             ${lake.feeding_windows && lake.feeding_windows.length > 0 ? `
               <div style="font-size: 9px; color: #475569; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px;">Feeding Windows</div>
               <div style="display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 10px;">
-                ${lake.feeding_windows.map(w => `<span style="background: #0891b215; border: 1px solid #0891b230; color: #67e8f9; border-radius: 4px; padding: 1px 6px; font-size: 10px; font-family: 'JetBrains Mono', monospace;">🕐 ${w}</span>`).join('')}
+                ${lake.feeding_windows.map(w => `<span style="background: #0891b215; border: 1px solid #0891b230; color: #67e8f9; border-radius: 4px; padding: 1px 6px; font-size: 10px; font-family: monospace;">🕐 ${w}</span>`).join('')}
               </div>
             ` : ''}
             <a href="https://www.google.com/maps/dir/?api=1&destination=${lake.lat},${lake.lon}"
@@ -114,7 +117,7 @@ export function LakeMap({ lakes, variant = 'mobile' }: Props) {
                 background: #0ea5e915; border: 1px solid #0ea5e940;
                 color: #38bdf8; border-radius: 8px;
                 padding: 6px; font-size: 11px; text-decoration: none;
-                font-family: 'DM Sans', sans-serif;
+                font-family: sans-serif;
                "
             >📍 Navigate Here</a>
           </div>
@@ -128,7 +131,7 @@ export function LakeMap({ lakes, variant = 'mobile' }: Props) {
       mapInstanceRef.current?.remove();
       mapInstanceRef.current = null;
     };
-  }, []); // mount once
+  }, [externalMapAllowed]); // mount after explicit approval
 
   // Update markers when lakes change (silent refresh)
   useEffect(() => {
@@ -138,7 +141,28 @@ export function LakeMap({ lakes, variant = 'mobile' }: Props) {
   return (
     <div className="relative rounded-2xl overflow-hidden border border-white/10 shadow-xl">
       <div ref={mapRef} className={variant === 'desktop' ? 'h-[calc(100vh-170px)] min-h-[560px] w-full' : 'h-[380px] sm:h-[440px] w-full'} />
-      <div className="absolute bottom-3 left-3 flex gap-1.5 z-[400]">
+      {!externalMapAllowed && (
+        <div className="absolute inset-0 z-[500] flex items-center justify-center bg-mud-900 px-6 text-center">
+          <div className="max-w-md">
+            <h3 className="font-display text-2xl tracking-wide text-white">Hartă externă</h3>
+            <p className="mt-3 text-sm leading-relaxed text-slate-400">
+              Harta este furnizată de CARTO/OpenStreetMap. Dacă o încarci, adresa IP și datele
+              tehnice necesare conexiunii vor fi transmise furnizorului hărții.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                externalMapAllowedForSession = true;
+                setExternalMapAllowed(true);
+              }}
+              className="mt-5 rounded-xl border border-lake-500/40 bg-lake-600/25 px-4 py-3 text-sm font-semibold text-white hover:bg-lake-600/40"
+            >
+              Încarcă harta externă
+            </button>
+          </div>
+        </div>
+      )}
+      {externalMapAllowed && <div className="absolute bottom-3 left-3 flex gap-1.5 z-[400]">
         {[
           { color: '#22c55e', label: '70–100' },
           { color: '#eab308', label: '40–70' },
@@ -152,7 +176,7 @@ export function LakeMap({ lakes, variant = 'mobile' }: Props) {
             <span className="text-[10px] text-slate-400 font-mono">{label}</span>
           </div>
         ))}
-      </div>
+      </div>}
     </div>
   );
 }

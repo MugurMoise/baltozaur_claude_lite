@@ -5,9 +5,9 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        display: ['"Bebas Neue"', 'cursive'],
-        body: ['"DM Sans"', 'sans-serif'],
-        mono: ['"JetBrains Mono"', 'monospace'],
+        display: ['Impact', '"Arial Narrow"', 'sans-serif'],
+        body: ['Inter', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'sans-serif'],
+        mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
       },
       colors: {
         lake: {

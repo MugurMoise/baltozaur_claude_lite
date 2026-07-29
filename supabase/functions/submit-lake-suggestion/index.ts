@@ -114,6 +114,7 @@ serve(async (req) => {
   }
 
   const payload = await req.json() as SuggestionPayload;
+  const isDev = payload.appEnv === "dev";
   const name = clean(payload.name);
   if (!name) {
     return new Response(JSON.stringify({ success: false, error: "Numele baltii este obligatoriu" }), {
@@ -122,10 +123,10 @@ serve(async (req) => {
     });
   }
 
-  const table = payload.appEnv === "dev" ? "dev_lake_suggestions" : "lake_suggestions";
-  const ip = clientIp(req);
-  const userAgent = req.headers.get("user-agent");
-  const submitterEmail = clean(payload.submitter_email);
+  const table = isDev ? "dev_lake_suggestions" : "lake_suggestions";
+  const ip = isDev ? null : clientIp(req);
+  const userAgent = isDev ? null : req.headers.get("user-agent");
+  const submitterEmail = isDev ? null : clean(payload.submitter_email);
   const adminEmail = Deno.env.get("SUGGESTION_ADMIN_EMAIL");
 
   const supabase = createClient(supabaseUrl, serviceRoleKey);
@@ -138,7 +139,7 @@ serve(async (req) => {
       lon: payload.lon ?? null,
       website_url: clean(payload.website_url),
       facebook_url: clean(payload.facebook_url),
-      phone: clean(payload.phone),
+      phone: isDev ? null : clean(payload.phone),
       notes: clean(payload.notes),
       submitter_email: submitterEmail,
       submitter_ip: ip,
@@ -155,7 +156,7 @@ serve(async (req) => {
     });
   }
 
-  const adminEmailSent = adminEmail
+  const adminEmailSent = !isDev && adminEmail
     ? await sendEmail({
       to: adminEmail,
       subject: `Sugestie noua: ${name}`,
@@ -163,7 +164,7 @@ serve(async (req) => {
     })
     : false;
 
-  const confirmationSent = submitterEmail
+  const confirmationSent = !isDev && submitterEmail
     ? await sendEmail({
       to: submitterEmail,
       subject: "Am primit sugestia ta pentru Baltozaur",
