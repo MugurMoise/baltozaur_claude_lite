@@ -143,7 +143,10 @@ export function AdminAnalyticsPanel({ environment }: { environment: string }) {
     setLoading(true);
     setError(null);
 
-    const { data, error: loadError } = await supabase.rpc('get_dev_aggregate_analytics', {
+    const rpcName = environment === 'dev'
+      ? 'get_dev_aggregate_analytics'
+      : 'get_aggregate_analytics';
+    const { data, error: loadError } = await supabase.rpc(rpcName, {
       p_days: days,
     });
 
