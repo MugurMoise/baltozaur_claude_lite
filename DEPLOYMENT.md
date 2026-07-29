@@ -17,7 +17,7 @@ The frontend chooses tables with `VITE_APP_ENV`:
 VITE_APP_ENV=dev
 ```
 
-When `VITE_APP_ENV=dev`, the app still reads lakes and scores from the common `lakes`, `lake_scores`, and `latest_lake_scores` tables. Auxiliary tables such as suggestions, social posts, and push subscriptions keep their `dev_*` prefix. Any other value, or an unset value, uses production table names everywhere.
+When `VITE_APP_ENV=dev`, the app still reads lakes and scores from the common `lakes`, `lake_scores`, and `latest_lake_scores` tables. Auxiliary tables such as suggestions and social posts keep their `dev_*` prefix. Any other value, or an unset value, uses production table names everywhere.
 
 ## Local Development
 
@@ -48,7 +48,6 @@ Use the same Supabase URL/key in both environments, but change `VITE_APP_ENV`:
 | `VITE_APP_ENV` | `dev` | `prod` |
 | `VITE_SUPABASE_URL` | Supabase project URL | Supabase project URL |
 | `VITE_SUPABASE_ANON_KEY` | Supabase anon key | Supabase anon key |
-| `VITE_VAPID_PUBLIC_KEY` | dev/test key if used | prod key if used |
 
 Use `main` as the production branch in Vercel. Pushes to `dev` should create preview deployments.
 
@@ -61,9 +60,7 @@ It creates legacy dev mirror tables:
 - `dev_lakes`
 - `dev_lake_scores`
 - `dev_latest_lake_scores`
-- `dev_push_subscriptions`
-
-It also inserts a tiny seed dataset. The current app uses the common lake and score tables instead of these mirror tables.
+It also inserts a tiny seed dataset. The current app uses the common lake and score tables instead of these mirror tables. Push subscriptions are retired and removed by later privacy migrations.
 
 ## Supabase Pipeline
 
@@ -145,4 +142,4 @@ before relying on it for releases.
 
 ## Secrets
 
-Never commit real `.env` files, service role keys, VAPID private keys, or personal access tokens. Store production secrets only in Vercel/Supabase dashboards.
+Never commit real `.env` files, service role keys, or personal access tokens. Store production secrets only in Vercel/Supabase dashboards.
