@@ -115,7 +115,7 @@ serve(async (req) => {
 
   const payload = await req.json() as SuggestionPayload;
   const isDev = payload.appEnv === "dev";
-  const name = clean(payload.name);
+  const name = clean(payload.name) ?? (isDev ? "Sugestie fără nume" : null);
   if (!name) {
     return new Response(JSON.stringify({ success: false, error: "Numele baltii este obligatoriu" }), {
       status: 400,
