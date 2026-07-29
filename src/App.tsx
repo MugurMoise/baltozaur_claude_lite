@@ -9,12 +9,14 @@ import { LakeMap } from './components/LakeMap';
 import { StatsBar } from './components/StatsBar';
 import { BestFeedingSection } from './components/BestFeedingSection';
 import { HowItWorks } from './components/HowItWorks';
+import { LegalFooter } from './components/LegalFooter';
 import { getLocalDateKey } from './lib/date';
 import { createLakeCodeMap } from './lib/lakeLinks';
 import { trackEvent } from './lib/analytics';
 import { SocialSignalsPage } from './pages/SocialSignalsPage';
 import { AddLakePage } from './pages/AddLakePage';
 import { AdminSuggestionsPage } from './pages/AdminSuggestionsPage';
+import { LegalPage } from './pages/LegalPage';
 
 type Tab    = 'list' | 'map';
 type Filter = 'all' | 'excellent' | 'improving';
@@ -100,6 +102,9 @@ function distanceBetweenKm(from: UserLocation, to: UserLocation) {
 }
 
 export default function App() {
+  if (window.location.pathname.startsWith('/legal')) {
+    return <LegalPage />;
+  }
   if (window.location.pathname.startsWith('/social')) {
     return <SocialSignalsPage />;
   }
@@ -684,12 +689,12 @@ function DashboardApp() {
                 </>
               )}
 
-              <footer className="text-center py-8 text-xs text-slate-700 font-body">
-                Baltozaur · baltozaur.ro ·{' '}
-                <a href="/suggest-lake" className="text-slate-500 hover:text-slate-300">
-                  {tr.suggestLakeLink}
-                </a>
-              </footer>
+              <div>
+                <p className="pb-4 text-center text-xs text-slate-600">
+                  <a href="/suggest-lake" className="hover:text-slate-300">{tr.suggestLakeLink}</a>
+                </p>
+                <LegalFooter />
+              </div>
             </>
           )}
         </main>
