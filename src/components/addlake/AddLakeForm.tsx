@@ -28,7 +28,6 @@ const initialState: FormState = {
 export function AddLakeForm() {
   const [form, setForm] = useState<FormState>(initialState);
   const [loading, setLoading] = useState(false);
-  const [legalAccepted, setLegalAccepted] = useState(false);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   const updateField = (field: keyof FormState, value: string) => {
@@ -44,10 +43,6 @@ export function AddLakeForm() {
 
     const lat = form.lat.trim() ? Number(form.lat) : null;
     const lon = form.lon.trim() ? Number(form.lon) : null;
-    if (!form.name.trim()) {
-      setToast({ type: 'error', message: 'Completeaza numele baltii.' });
-      return;
-    }
     if ((lat !== null && !Number.isFinite(lat)) || (lon !== null && !Number.isFinite(lon))) {
       setToast({ type: 'error', message: 'Coordonatele nu par valide.' });
       return;
@@ -78,7 +73,6 @@ export function AddLakeForm() {
     }
 
     setForm(initialState);
-    setLegalAccepted(false);
     setToast({ type: 'success', message: 'Multumim. Sugestia a fost trimisa pentru verificare.' });
   };
 
@@ -89,11 +83,11 @@ export function AddLakeForm() {
           <a href="/" className="text-sm text-slate-500 hover:text-white">← Baltozaur</a>
           <h1 className="font-display text-3xl tracking-wide mt-2">Sugereaza o balta</h1>
           <p className="mt-2 text-sm text-slate-400">
-            Trimite o sugestie pentru review. Nu apare automat in lista publica.
+            Toate câmpurile sunt opționale. Sugestia nu apare automat în lista publică.
           </p>
         </div>
 
-        <FormField label="Nume balta" required props={{ value: form.name, onChange: (event) => updateField('name', event.target.value) }} />
+        <FormField label="Nume balta" props={{ value: form.name, onChange: (event) => updateField('name', event.target.value) }} />
         <FormField label="Judet / zona" props={{ value: form.county, onChange: (event) => updateField('county', event.target.value) }} />
         <div className="grid grid-cols-2 gap-3">
           <FormField label="Latitudine" props={{ value: form.lat, onChange: (event) => updateField('lat', event.target.value), inputMode: 'decimal' }} />
@@ -114,20 +108,10 @@ export function AddLakeForm() {
           Nu introduce nume, email, telefon sau alte date personale. Nu salvăm IP-ul ori informațiile
           browserului împreună cu sugestia.
         </p>
-        <label className="flex items-start gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-3 text-xs leading-relaxed text-slate-300">
-          <input
-            type="checkbox"
-            required
-            checked={legalAccepted}
-            onChange={(event) => setLegalAccepted(event.target.checked)}
-            className="mt-1"
-          />
-          <span>
-            Confirm că sugestia nu conține date personale și accept că informațiile despre baltă
-            pot fi verificate, corectate și publicate conform{' '}
-            <a href="/legal#termeni" className="text-lake-300 underline">termenilor</a>.
-          </span>
-        </label>
+        <p className="rounded-xl border border-white/10 bg-white/[0.03] p-3 text-xs leading-relaxed text-slate-300">
+          Prin trimitere, informațiile despre baltă pot fi verificate, corectate și publicate
+          conform <a href="/legal#termeni" className="text-lake-300 underline">termenilor</a>.
+        </p>
         <SubmitButton loading={loading} label="Trimite sugestia" loadingLabel="Se trimite..." />
       </form>
 
