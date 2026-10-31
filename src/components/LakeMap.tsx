@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import type { LakeScore } from '../types/lake';
 import { getScoreColor, getScoreLabel } from '../types/lake';
 
@@ -7,15 +7,12 @@ interface Props {
   variant?: 'mobile' | 'desktop';
 }
 
-let externalMapAllowedForSession = false;
-
 export function LakeMap({ lakes, variant = 'mobile' }: Props) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<import('leaflet').Map | null>(null);
-  const [externalMapAllowed, setExternalMapAllowed] = useState(externalMapAllowedForSession);
 
   useEffect(() => {
-    if (!externalMapAllowed || !mapRef.current || mapInstanceRef.current) return;
+    if (!mapRef.current || mapInstanceRef.current) return;
 
     let L: typeof import('leaflet');
     import('leaflet').then((leaflet) => {
@@ -131,7 +128,7 @@ export function LakeMap({ lakes, variant = 'mobile' }: Props) {
       mapInstanceRef.current?.remove();
       mapInstanceRef.current = null;
     };
-  }, [externalMapAllowed]); // mount after explicit approval
+  }, []);
 
   // Update markers when lakes change (silent refresh)
   useEffect(() => {
@@ -141,28 +138,7 @@ export function LakeMap({ lakes, variant = 'mobile' }: Props) {
   return (
     <div className="relative rounded-2xl overflow-hidden border border-white/10 shadow-xl">
       <div ref={mapRef} className={variant === 'desktop' ? 'h-[calc(100vh-170px)] min-h-[560px] w-full' : 'h-[380px] sm:h-[440px] w-full'} />
-      {!externalMapAllowed && (
-        <div className="absolute inset-0 z-[500] flex items-center justify-center bg-mud-900 px-6 text-center">
-          <div className="max-w-md">
-            <h3 className="font-display text-2xl tracking-wide text-white">Hartă externă</h3>
-            <p className="mt-3 text-sm leading-relaxed text-slate-400">
-              Harta este furnizată de CARTO/OpenStreetMap. Dacă o încarci, adresa IP și datele
-              tehnice necesare conexiunii vor fi transmise furnizorului hărții.
-            </p>
-            <button
-              type="button"
-              onClick={() => {
-                externalMapAllowedForSession = true;
-                setExternalMapAllowed(true);
-              }}
-              className="mt-5 rounded-xl border border-lake-500/40 bg-lake-600/25 px-4 py-3 text-sm font-semibold text-white hover:bg-lake-600/40"
-            >
-              Încarcă harta externă
-            </button>
-          </div>
-        </div>
-      )}
-      {externalMapAllowed && <div className="absolute bottom-3 left-3 flex gap-1.5 z-[400]">
+      <div className="absolute bottom-3 left-3 flex gap-1.5 z-[400]">
         {[
           { color: '#22c55e', label: '70–100' },
           { color: '#eab308', label: '40–70' },
@@ -176,7 +152,7 @@ export function LakeMap({ lakes, variant = 'mobile' }: Props) {
             <span className="text-[10px] text-slate-400 font-mono">{label}</span>
           </div>
         ))}
-      </div>}
+      </div>
     </div>
   );
 }
