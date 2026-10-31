@@ -13,9 +13,11 @@ interface DailyMetric {
 }
 
 interface ActivityLogEntry {
-  day: string;
+  occurred_at: string;
+  visitor_id: string;
   name: string;
-  events: number;
+  page_path: string;
+  details: Record<string, string | number | boolean | null>;
 }
 
 interface AnalyticsSummary {
@@ -29,7 +31,6 @@ interface AnalyticsSummary {
   events: NamedMetric[];
   top_lakes: NamedMetric[];
   daily: DailyMetric[];
-  activity_log: ActivityLogEntry[];
 }
 
 const emptySummary: AnalyticsSummary = {
@@ -40,7 +41,6 @@ const emptySummary: AnalyticsSummary = {
   events: [],
   top_lakes: [],
   daily: [],
-  activity_log: [],
 };
 
 const eventLabels: Record<string, string> = {
@@ -105,11 +105,18 @@ function countryLabel(countryCode: string) {
   }
 }
 
-function activityDayLabel(day: string) {
-  const date = new Date(`${day}T00:00:00`);
+function activityTimeLabel(occurredAt: string) {
+  const date = new Date(occurredAt);
   return Number.isNaN(date.getTime())
-    ? day
-    : new Intl.DateTimeFormat('ro-RO', { day: 'numeric', month: 'short', year: 'numeric' }).format(date);
+    ? occurredAt
+    : new Intl.DateTimeFormat('ro-RO', {
+      day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit',
+    }).format(date);
+}
+
+function activityDetailsLabel(details: ActivityLogEntry['details']) {
+  const entries = Object.entries(details);
+  return entries.length === 0 ? '—' : entries.map(([key, value]) => `${key}: ${String(value)}`).join(' · ');
 }
 
 function MetricList({
@@ -150,6 +157,7 @@ function MetricList({
 export function AdminAnalyticsPanel({ environment }: { environment: string }) {
   const [days, setDays] = useState(30);
   const [summary, setSummary] = useState<AnalyticsSummary>(emptySummary);
+  const [activityLog, setActivityLog] = useState<ActivityLogEntry[]>([]);
   const [activityLimit, setActivityLimit] = useState(25);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -162,9 +170,13 @@ export function AdminAnalyticsPanel({ environment }: { environment: string }) {
     const rpcName = environment === 'dev'
       ? 'get_dev_aggregate_analytics'
       : 'get_aggregate_analytics';
-    const { data, error: loadError } = await supabase.rpc(rpcName, {
-      p_days: days,
-    });
+    const activityRpcName = environment === 'dev'
+      ? null
+      : 'get_analytics_activity_log';
+    const [{ data, error: loadError }, activityResult] = await Promise.all([
+      supabase.rpc(rpcName, { p_days: days }),
+      activityRpcName ? supabase.rpc(activityRpcName, { p_days: days, p_limit: 250 }) : Promise.resolve({ data: [], error: null }),
+    ]);
 
     setLoading(false);
     if (loadError) {
@@ -175,6 +187,11 @@ export function AdminAnalyticsPanel({ environment }: { environment: string }) {
     }
 
     setSummary((data as AnalyticsSummary | null) ?? emptySummary);
+    if (activityResult.error) {
+      setError(`${activityResult.error.message}. Verifică dacă migrația pentru jurnalul de activitate a fost aplicată.`);
+      return;
+    }
+    setActivityLog((activityResult.data as ActivityLogEntry[] | null) ?? []);
   }
 
   useEffect(() => {
@@ -337,10 +354,10 @@ export function AdminAnalyticsPanel({ environment }: { environment: string }) {
               Acțiuni grupate pe zi și tip, fără informații despre vizitatori sau sesiuni.
             </p>
           </div>
-          <span className="text-xs text-slate-500">{number(summary.activity_log.length)} înregistrări agregate</span>
+          <span className="text-xs text-slate-500">{number(activityLog.length)} activități recente</span>
         </div>
 
-        {summary.activity_log.length === 0 ? (
+        {activityLog.length === 0 ? (
           <p className="mt-4 text-sm text-slate-500">Nu există încă acțiuni pentru perioada selectată.</p>
         ) : (
           <>
@@ -348,23 +365,25 @@ export function AdminAnalyticsPanel({ environment }: { environment: string }) {
               <table className="w-full min-w-[460px] text-left text-sm">
                 <thead className="border-b border-white/10 text-xs uppercase tracking-[0.12em] text-slate-500">
                   <tr>
-                    <th className="px-3 py-2 font-medium">Zi</th>
+                    <th className="px-3 py-2 font-medium">Moment</th>
+                    <th className="px-3 py-2 font-medium">ID vizitator</th>
                     <th className="px-3 py-2 font-medium">Activitate</th>
-                    <th className="px-3 py-2 text-right font-medium">Total</th>
+                    <th className="px-3 py-2 font-medium">Detalii</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {summary.activity_log.slice(0, activityLimit).map((entry) => (
-                    <tr key={`${entry.day}-${entry.name}`} className="border-b border-white/[0.06] last:border-0">
-                      <td className="px-3 py-3 text-slate-400">{activityDayLabel(entry.day)}</td>
+                  {activityLog.slice(0, activityLimit).map((entry) => (
+                    <tr key={`${entry.occurred_at}-${entry.visitor_id}-${entry.name}`} className="border-b border-white/[0.06] last:border-0">
+                      <td className="whitespace-nowrap px-3 py-3 text-slate-400">{activityTimeLabel(entry.occurred_at)}</td>
+                      <td className="px-3 py-3 font-mono text-xs text-slate-400">{entry.visitor_id}</td>
                       <td className="px-3 py-3 text-slate-200">{labelFor(entry.name, eventLabels)}</td>
-                      <td className="px-3 py-3 text-right font-mono text-lime-200">{number(entry.events)}</td>
+                      <td className="max-w-[320px] truncate px-3 py-3 text-slate-400" title={`${entry.page_path} · ${activityDetailsLabel(entry.details)}`}>{entry.page_path} · {activityDetailsLabel(entry.details)}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-            {activityLimit < summary.activity_log.length && (
+            {activityLimit < activityLog.length && (
               <button
                 type="button"
                 onClick={() => setActivityLimit((current) => current + 25)}
