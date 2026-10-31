@@ -28,10 +28,16 @@ export function LakeMap({ lakes, variant = 'mobile' }: Props) {
 
       L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-      // Dark tile layer
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
+      // Esri's dark canvas tiles do not require a browser API key.
+      L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+        attribution: 'Tiles &copy; <a href="https://www.esri.com/">Esri</a>',
         maxZoom: 19,
+        maxNativeZoom: 16,
+      }).addTo(map);
+      L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}', {
+        attribution: 'Tiles &copy; <a href="https://www.esri.com/">Esri</a>',
+        maxZoom: 19,
+        maxNativeZoom: 16,
       }).addTo(map);
 
       lakes.forEach((lake) => {
