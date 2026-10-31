@@ -12,6 +12,12 @@ interface DailyMetric {
   interactions: number;
 }
 
+interface ActivityLogEntry {
+  day: string;
+  name: string;
+  events: number;
+}
+
 interface AnalyticsSummary {
   totals: {
     page_views: number;
@@ -23,6 +29,7 @@ interface AnalyticsSummary {
   events: NamedMetric[];
   top_lakes: NamedMetric[];
   daily: DailyMetric[];
+  activity_log: ActivityLogEntry[];
 }
 
 const emptySummary: AnalyticsSummary = {
@@ -33,6 +40,7 @@ const emptySummary: AnalyticsSummary = {
   events: [],
   top_lakes: [],
   daily: [],
+  activity_log: [],
 };
 
 const eventLabels: Record<string, string> = {
@@ -97,6 +105,13 @@ function countryLabel(countryCode: string) {
   }
 }
 
+function activityDayLabel(day: string) {
+  const date = new Date(`${day}T00:00:00`);
+  return Number.isNaN(date.getTime())
+    ? day
+    : new Intl.DateTimeFormat('ro-RO', { day: 'numeric', month: 'short', year: 'numeric' }).format(date);
+}
+
 function MetricList({
   rows,
   labels = {},
@@ -135,6 +150,7 @@ function MetricList({
 export function AdminAnalyticsPanel({ environment }: { environment: string }) {
   const [days, setDays] = useState(30);
   const [summary, setSummary] = useState<AnalyticsSummary>(emptySummary);
+  const [activityLimit, setActivityLimit] = useState(25);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -162,6 +178,7 @@ export function AdminAnalyticsPanel({ environment }: { environment: string }) {
   }
 
   useEffect(() => {
+    setActivityLimit(25);
     void loadAnalytics();
   }, [days, environment]);
 
@@ -309,6 +326,54 @@ export function AdminAnalyticsPanel({ environment }: { environment: string }) {
               );
             })}
           </div>
+        )}
+      </article>
+
+      <article className="rounded-lg border border-white/10 bg-white/[0.04] p-5">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h3 className="font-semibold">Jurnal de activitate</h3>
+            <p className="mt-1 text-xs text-slate-500">
+              Acțiuni grupate pe zi și tip, fără informații despre vizitatori sau sesiuni.
+            </p>
+          </div>
+          <span className="text-xs text-slate-500">{number(summary.activity_log.length)} înregistrări agregate</span>
+        </div>
+
+        {summary.activity_log.length === 0 ? (
+          <p className="mt-4 text-sm text-slate-500">Nu există încă acțiuni pentru perioada selectată.</p>
+        ) : (
+          <>
+            <div className="mt-4 overflow-x-auto">
+              <table className="w-full min-w-[460px] text-left text-sm">
+                <thead className="border-b border-white/10 text-xs uppercase tracking-[0.12em] text-slate-500">
+                  <tr>
+                    <th className="px-3 py-2 font-medium">Zi</th>
+                    <th className="px-3 py-2 font-medium">Activitate</th>
+                    <th className="px-3 py-2 text-right font-medium">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {summary.activity_log.slice(0, activityLimit).map((entry) => (
+                    <tr key={`${entry.day}-${entry.name}`} className="border-b border-white/[0.06] last:border-0">
+                      <td className="px-3 py-3 text-slate-400">{activityDayLabel(entry.day)}</td>
+                      <td className="px-3 py-3 text-slate-200">{labelFor(entry.name, eventLabels)}</td>
+                      <td className="px-3 py-3 text-right font-mono text-lime-200">{number(entry.events)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {activityLimit < summary.activity_log.length && (
+              <button
+                type="button"
+                onClick={() => setActivityLimit((current) => current + 25)}
+                className="mt-4 rounded-lg border border-white/10 px-3 py-2 text-sm text-slate-200 hover:bg-white/5"
+              >
+                Arată încă 25
+              </button>
+            )}
+          </>
         )}
       </article>
     </section>
