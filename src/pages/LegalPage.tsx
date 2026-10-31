@@ -49,13 +49,13 @@ export function LegalPage() {
             introduse date personale.
           </p>
 
-          <h3 className="text-base font-semibold text-white">Statistici anonime</h3>
+          <h3 className="text-base font-semibold text-white">Statistici pseudonimizate</h3>
           <p>
-            Pentru a înțelege utilitatea aplicației sunt păstrate numai valori agregate: numărul de
-            vizite și acțiuni, pagina, sursa generală a accesării (de exemplu TikTok, Facebook,
-            motor de căutare sau acces direct), tipul general de dispozitiv și țara la nivel
-            agregat. Nu se creează profiluri individuale și nu se stochează în analytics adresa IP,
-            un identificator de utilizator sau un identificator persistent al dispozitivului.
+            Pentru a înțelege utilizarea aplicației sunt păstrate numărul de vizite și acțiuni,
+            pagina, sursa generală a accesării, tipul general de dispozitiv și țara la nivel
+            agregat. Pentru jurnalul administrativ se păstrează și momentul acțiunii, tipul ei,
+            pagina și un identificator aleator, fără legătură cu numele, emailul sau contul tău.
+            Nu se stochează adresa IP și nu se creează un profil comercial.
           </p>
 
           <h3 className="text-base font-semibold text-white">Localizare</h3>
@@ -93,10 +93,10 @@ export function LegalPage() {
         <section id="stocare-locala" className="scroll-mt-6 space-y-4">
           <h2 className="font-display text-3xl tracking-wide text-white">Cookie-uri și stocare locală</h2>
           <p>
-            Baltozaur nu folosește cookie-uri de marketing, publicitate sau profilare și nu folosește
-            servicii terțe de analytics. Aplicația poate păstra în localStorage numai preferința de
-            afișare, zona aleasă și datele de lucru ale modulului social administrativ. Aceste date
-            rămân în browserul tău și sunt necesare doar pentru funcțiile cerute.
+            Baltozaur nu folosește cookie-uri de marketing sau publicitate și nu folosește servicii
+            terțe de analytics. Aplicația păstrează în localStorage preferința de afișare, zona aleasă,
+            datele de lucru ale modulului social administrativ și un identificator aleator folosit
+            numai pentru jurnalul de activitate. Butonul de mai jos șterge toate aceste date locale.
           </p>
           <button
             type="button"

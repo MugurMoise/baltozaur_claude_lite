@@ -39,17 +39,14 @@ export function DashboardHeader({
 
   return (
     <header className="sticky top-0 z-50 backdrop-blur-xl bg-mud-900/85 border-b border-white/5">
-      <div
-        className={`${effectiveView === 'desktop' ? 'max-w-7xl' : 'max-w-2xl'} mx-auto px-3 pb-3 sm:px-4 sm:pb-4`}
-        style={{ paddingTop: 'calc(env(safe-area-inset-top) + 0.75rem)' }}
-      >
+      <div className={`${effectiveView === 'desktop' ? 'max-w-7xl' : 'max-w-2xl'} mx-auto px-4 py-4`}>
         <div className="flex items-center justify-between gap-2">
           <div className="flex min-w-0 items-center gap-2 sm:gap-3">
             <div className="relative">
               <img
                 src="/baltozaur-mark.png"
                 alt="Baltozaur"
-                className="h-9 w-10 object-contain drop-shadow-[0_8px_18px_rgba(0,0,0,0.45)] sm:h-14 sm:w-16"
+                className="h-11 w-12 object-contain drop-shadow-[0_8px_18px_rgba(0,0,0,0.45)] sm:h-14 sm:w-16"
               />
               {isToday && (
                 <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-mud-900">
@@ -58,7 +55,7 @@ export function DashboardHeader({
               )}
             </div>
             <div className="min-w-0">
-              <h1 className="truncate font-display text-xl text-white tracking-wider leading-none sm:text-3xl">BALTOZAUR</h1>
+              <h1 className="truncate font-display text-2xl text-white tracking-wider leading-none sm:text-3xl">BALTOZAUR</h1>
               <p className="hidden text-xs text-slate-500 font-body mt-0.5 sm:block">{tr.appSubtitle}</p>
             </div>
           </div>
@@ -69,7 +66,7 @@ export function DashboardHeader({
               onChange={(event) => onViewModeChange(event.target.value as ViewMode)}
               aria-label={tr.viewMode}
               title={tr.viewMode}
-              className="h-9 max-w-[68px] rounded-2xl bg-white/5 border border-white/10 pl-2 pr-5 text-[11px] font-body font-semibold text-slate-300 hover:text-white hover:bg-white/10 transition-all outline-none sm:h-10 sm:max-w-none sm:pl-3 sm:pr-8 sm:text-xs"
+              className="h-9 max-w-[76px] rounded-2xl bg-white/5 border border-white/10 pl-2.5 pr-6 text-xs font-body font-semibold text-slate-300 hover:text-white hover:bg-white/10 transition-all outline-none sm:h-10 sm:max-w-none sm:pl-3 sm:pr-8"
             >
               <option value="auto">{tr.viewAuto}</option>
               <option value="mobile">{tr.viewMobile}</option>
@@ -79,7 +76,7 @@ export function DashboardHeader({
               value={lang}
               onChange={(event) => onLangChange(event.target.value as Lang)}
               aria-label="Language"
-              className="h-9 max-w-[64px] rounded-2xl bg-white/5 border border-white/10 pl-2 pr-5 text-[11px] font-body font-semibold text-slate-300 hover:text-white hover:bg-white/10 transition-all outline-none sm:h-10 sm:max-w-none sm:pl-3 sm:pr-8 sm:text-xs"
+              className="h-9 max-w-[70px] rounded-2xl bg-white/5 border border-white/10 pl-2.5 pr-6 text-xs font-body font-semibold text-slate-300 hover:text-white hover:bg-white/10 transition-all outline-none sm:h-10 sm:max-w-none sm:pl-3 sm:pr-8"
             >
               {LANGUAGES.map((code) => (
                 <option key={code} value={code}>

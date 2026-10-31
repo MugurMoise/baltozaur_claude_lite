@@ -45,63 +45,6 @@ function parseFeedingWindow(window: string) {
   };
 }
 
-function getBaitRecommendation(lake: LakeScore) {
-  const isCold = lake.temperature < 14;
-  const isWarm = lake.temperature >= 22;
-  const isRainy = (lake.precipitation ?? 0) >= MIN_DISPLAY_PRECIPITATION_MM;
-  const isWindy = lake.wind_speed >= 18;
-  const pressureDropping = (lake.pressure_delta ?? 0) < -0.5;
-  const isGoodScore = lake.score >= 55;
-
-  if (isCold) {
-    return {
-      bait: 'RMF Baits PrimeMix Groundbait White 900g',
-      wafter: isRainy ? 'RMF Baits Mini Wafters Mango-Rush' : 'RMF Baits Mini Wafters Coco-Snow',
-      wafterSize: '4 mm',
-      wafterColor: isRainy ? 'yellow' : 'white',
-      hook: 'nr. 8-10',
-    };
-  }
-
-  if (isWarm && isGoodScore && !isWindy) {
-    return {
-      bait: pressureDropping ? 'RMF Baits PrimeMix Groundbait Krill 900g' : 'RMF Baits PrimeMix Groundbait Brown 900g',
-      wafter: pressureDropping ? 'RMF Baits Wafters Turbo-Fresh' : 'RMF Baits Wafters Choco-Loco',
-      wafterSize: '6 mm',
-      wafterColor: pressureDropping ? 'green' : 'brown',
-      hook: 'nr. 6-8',
-    };
-  }
-
-  if (isRainy || isWindy) {
-    return {
-      bait: 'RMF Baits PrimeMix Groundbait Green 900g',
-      wafter: isRainy ? 'RMF Baits Wafters Mango-Rush' : 'RMF Baits Wafters Turbo-Fresh',
-      wafterSize: '6 mm',
-      wafterColor: isRainy ? 'yellow' : 'green',
-      hook: 'nr. 6-8',
-    };
-  }
-
-  if (!isGoodScore) {
-    return {
-      bait: 'RMF Baits PrimeMix Groundbait White 900g',
-      wafter: 'RMF Baits Mini Wafters Coco-Snow',
-      wafterSize: '4 mm',
-      wafterColor: 'white',
-      hook: 'nr. 8',
-    };
-  }
-
-  return {
-    bait: pressureDropping ? 'RMF Baits PrimeMix Groundbait Green 900g' : 'RMF Baits PrimeMix Groundbait Brown 900g',
-    wafter: pressureDropping ? 'RMF Baits Wafters Double-Trouble' : 'RMF Baits Wafters Choco-Boom',
-    wafterSize: '6 mm',
-    wafterColor: pressureDropping ? 'green' : 'brown',
-    hook: 'nr. 6-8',
-  };
-}
-
 export function LakeCard({ lake, rank, lang, userLocation, highlighted = false, shareCode, showQrNavigation = false }: Props) {
   const [expanded, setExpanded] = useState(highlighted);
   const [copied, setCopied] = useState(false);
@@ -112,7 +55,6 @@ export function LakeCard({ lake, rank, lang, userLocation, highlighted = false, 
   const gradient = getScoreGradient(lake.score);
   const recommendation = getRecommendation(lake.score, lang);
   const conditionTags = getConditionTags(lake, lang);
-  const baitRecommendation = getBaitRecommendation(lake);
   const userDistance = userLocation
     ? Math.round(distanceBetweenKm(userLocation, { lat: lake.lat, lon: lake.lon }))
     : null;
@@ -346,35 +288,6 @@ export function LakeCard({ lake, rank, lang, userLocation, highlighted = false, 
                 </div>
               </div>
             )}
-
-            <div className="mb-4 rounded-xl border border-cyan-400/20 bg-cyan-500/[0.07] px-3 py-3">
-              <div className="mb-2 flex items-center justify-between gap-3">
-                <span className="text-[10px] uppercase tracking-wider text-cyan-300 font-body">
-                  Recomandare montura
-                </span>
-                <span className="text-[10px] uppercase tracking-wider text-slate-500 font-body">
-                  POC
-                </span>
-              </div>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                <div className="min-w-0">
-                  <span className="block text-[10px] uppercase tracking-widest text-slate-500 font-body">Nada</span>
-                  <span className="mt-0.5 block text-xs font-semibold leading-snug text-slate-100">{baitRecommendation.bait}</span>
-                </div>
-                <div className="min-w-0">
-                  <span className="block text-[10px] uppercase tracking-widest text-slate-500 font-body">Wafter</span>
-                  <span className="mt-0.5 block text-xs font-semibold leading-snug text-slate-100">{baitRecommendation.wafter}</span>
-                </div>
-                <div className="min-w-0">
-                  <span className="block text-[10px] uppercase tracking-widest text-slate-500 font-body">Wafter</span>
-                  <span className="mt-0.5 block font-mono text-xs font-semibold text-white">{baitRecommendation.wafterSize} · {baitRecommendation.wafterColor}</span>
-                </div>
-                <div className="min-w-0">
-                  <span className="block text-[10px] uppercase tracking-widest text-slate-500 font-body">Carlig</span>
-                  <span className="mt-0.5 block font-mono text-xs font-semibold text-white">{baitRecommendation.hook}</span>
-                </div>
-              </div>
-            </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <div className="flex flex-col gap-1">
