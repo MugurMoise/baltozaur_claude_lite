@@ -24,6 +24,26 @@ function countryFromRequest(request: Request) {
   return country && /^[A-Z]{2}$/.test(country) ? country : null;
 }
 
+function decodeHeaderValue(value: string | null, maxLength: number) {
+  if (!value) return null;
+  try {
+    const decoded = decodeURIComponent(value).trim().replace(/[\u0000-\u001f\u007f]/g, '');
+    return decoded ? decoded.slice(0, maxLength) : null;
+  } catch {
+    return null;
+  }
+}
+
+function locationFromRequest(request: Request) {
+  // Vercel derives these fields from the request IP. The IP itself is never
+  // forwarded to Supabase or written to the analytics database.
+  return {
+    country: countryFromRequest(request),
+    region: decodeHeaderValue(request.headers.get('x-vercel-ip-country-region'), 12),
+    city: decodeHeaderValue(request.headers.get('x-vercel-ip-city'), 120),
+  };
+}
+
 function validCount(value: unknown): value is AnalyticsCount {
   if (!value || typeof value !== 'object') return false;
   const count = value as Partial<AnalyticsCount>;
@@ -107,7 +127,8 @@ export default {
     const pageViews = mergedCounts.find(
       (count) => count.metric === 'page_view' && count.bucket === 'all'
     )?.count ?? 0;
-    const country = countryFromRequest(request);
+    const location = locationFromRequest(request);
+    const country = location.country;
     if (country && pageViews > 0) {
       mergedCounts.push({ metric: 'country', bucket: country, count: pageViews });
     }
@@ -119,7 +140,7 @@ export default {
     }
 
     const isDev = process.env.VITE_APP_ENV === 'dev';
-    const rpcName = isDev ? 'increment_dev_analytics_counts' : 'record_analytics_batch';
+    const rpcName = isDev ? 'record_dev_analytics_batch' : 'record_analytics_batch';
     const response = await fetch(`${supabaseUrl}/rest/v1/rpc/${rpcName}`, {
       method: 'POST',
       headers: {
@@ -128,8 +149,8 @@ export default {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(isDev
-        ? { p_counts: mergedCounts }
-        : { p_counts: mergedCounts, p_activities: activities }),
+        ? { p_counts: mergedCounts, p_activities: activities, p_location: location }
+        : { p_counts: mergedCounts, p_activities: activities, p_location: location }),
     });
 
     if (!response.ok) {
