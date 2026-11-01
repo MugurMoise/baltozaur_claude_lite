@@ -75,7 +75,9 @@ export function LegalPage() {
             aplicație; furnizorul hărții va primi atunci datele tehnice necesare conexiunii.
           </p>
           <p>
-            Temeiul urmărit este interesul legitim pentru securitate și statistici strict agregate,
+            Pentru analytics, Baltozaur salvează un identificator aleator al browserului, acțiunile din aplicație și
+            locația aproximativă (țară, regiune, oraș) determinată de infrastructură din IP. Adresa IP nu este salvată.
+            Temeiul urmărit este interesul legitim pentru securitate și măsurarea utilizării,
             precum și consimțământul pentru localizare și încărcarea hărții externe. Datele sunt
             limitate la ceea ce este necesar. Mesajele trimise voluntar prin email sunt folosite
             numai pentru răspuns și sunt șterse când nu mai sunt necesare.
@@ -96,7 +98,7 @@ export function LegalPage() {
             Baltozaur nu folosește cookie-uri de marketing sau publicitate și nu folosește servicii
             terțe de analytics. Aplicația păstrează în localStorage preferința de afișare, zona aleasă,
             datele de lucru ale modulului social administrativ și un identificator aleator folosit
-            numai pentru jurnalul de activitate. Butonul de mai jos șterge toate aceste date locale.
+            pentru corelarea acțiunilor în jurnalul de activitate. Butonul de mai jos șterge toate aceste date locale.
           </p>
           <button
             type="button"

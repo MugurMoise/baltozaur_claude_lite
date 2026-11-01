@@ -18,6 +18,22 @@ interface ActivityLogEntry {
   name: string;
   page_path: string;
   details: Record<string, string | number | boolean | null>;
+  country_code: string | null;
+  region_code: string | null;
+  city: string | null;
+}
+
+interface VisitorProfile {
+  visitor_id: string;
+  first_seen: string;
+  last_seen: string;
+  events: number;
+  page_views: number;
+  countries: string[];
+  regions: string[];
+  cities: string[];
+  platforms: string[];
+  sources: string[];
 }
 
 interface AnalyticsSummary {
@@ -119,6 +135,12 @@ function activityDetailsLabel(details: ActivityLogEntry['details']) {
   return entries.length === 0 ? '—' : entries.map(([key, value]) => `${key}: ${String(value)}`).join(' · ');
 }
 
+function locationLabel(entry: Pick<ActivityLogEntry, 'country_code' | 'region_code' | 'city'>) {
+  const parts = [entry.city, entry.region_code, entry.country_code ? countryLabel(entry.country_code) : null]
+    .filter((value): value is string => Boolean(value));
+  return parts.length ? parts.join(', ') : 'Necunoscută';
+}
+
 function MetricList({
   rows,
   labels = {},
@@ -158,6 +180,9 @@ export function AdminAnalyticsPanel({ environment }: { environment: string }) {
   const [days, setDays] = useState(30);
   const [summary, setSummary] = useState<AnalyticsSummary>(emptySummary);
   const [activityLog, setActivityLog] = useState<ActivityLogEntry[]>([]);
+  const [profiles, setProfiles] = useState<VisitorProfile[]>([]);
+  const [selectedVisitorId, setSelectedVisitorId] = useState<string | null>(null);
+  const [visitorActivity, setVisitorActivity] = useState<ActivityLogEntry[]>([]);
   const [activityLimit, setActivityLimit] = useState(25);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -170,12 +195,13 @@ export function AdminAnalyticsPanel({ environment }: { environment: string }) {
     const rpcName = environment === 'dev'
       ? 'get_dev_aggregate_analytics'
       : 'get_aggregate_analytics';
-    const activityRpcName = environment === 'dev'
-      ? null
-      : 'get_analytics_activity_log';
-    const [{ data, error: loadError }, activityResult] = await Promise.all([
+    const isDev = environment === 'dev';
+    const activityRpcName = isDev ? 'get_dev_analytics_activity_log' : 'get_analytics_activity_log';
+    const profilesRpcName = isDev ? 'get_dev_analytics_visitor_profiles' : 'get_analytics_visitor_profiles';
+    const [{ data, error: loadError }, activityResult, profilesResult] = await Promise.all([
       supabase.rpc(rpcName, { p_days: days }),
-      activityRpcName ? supabase.rpc(activityRpcName, { p_days: days, p_limit: 250 }) : Promise.resolve({ data: [], error: null }),
+      supabase.rpc(activityRpcName, { p_days: days, p_limit: 250 }),
+      supabase.rpc(profilesRpcName, { p_days: days, p_limit: 100 }),
     ]);
 
     setLoading(false);
@@ -192,12 +218,40 @@ export function AdminAnalyticsPanel({ environment }: { environment: string }) {
       return;
     }
     setActivityLog((activityResult.data as ActivityLogEntry[] | null) ?? []);
+    if (profilesResult.error) {
+      setError(`${profilesResult.error.message}. Verifică migrația pentru profilurile de vizitatori.`);
+      return;
+    }
+    setProfiles((profilesResult.data as VisitorProfile[] | null) ?? []);
   }
 
   useEffect(() => {
     setActivityLimit(25);
     void loadAnalytics();
   }, [days, environment]);
+
+  useEffect(() => {
+    async function loadVisitorActivity() {
+      if (!supabase || !selectedVisitorId) {
+        setVisitorActivity([]);
+        return;
+      }
+      const visitorRpcName = environment === 'dev'
+        ? 'get_dev_analytics_visitor_activity'
+        : 'get_analytics_visitor_activity';
+      const { data, error: visitorError } = await supabase.rpc(visitorRpcName, {
+        p_visitor_id: selectedVisitorId,
+        p_days: days,
+        p_limit: 250,
+      });
+      if (visitorError) {
+        setError(visitorError.message);
+        return;
+      }
+      setVisitorActivity((data as ActivityLogEntry[] | null) ?? []);
+    }
+    void loadVisitorActivity();
+  }, [days, environment, selectedVisitorId]);
 
   const maxDailyTotal = Math.max(
     1,
@@ -211,7 +265,7 @@ export function AdminAnalyticsPanel({ environment }: { environment: string }) {
         <div>
           <h2 className="text-xl font-semibold">Utilizare și surse de trafic</h2>
           <p className="mt-1 text-sm text-slate-400">
-            Statistici zilnice agregate, fără IP, identificator de utilizator, sesiune sau activitate individuală.
+            Statistici agregate și jurnal pseudonimizat. IP-ul nu este stocat; locația este estimată la nivel de oraș din infrastructură.
           </p>
         </div>
         <div className="flex gap-2">
@@ -241,8 +295,7 @@ export function AdminAnalyticsPanel({ environment }: { environment: string }) {
 
       <article className="rounded-lg border border-lime-300/20 bg-lime-300/[0.06] p-4">
         <p className="text-sm text-lime-100">
-          Browserul grupează acțiunile timp de 8 secunde. Un lot produce un singur apel către baza de date,
-          indiferent câte acțiuni duplicate conține. Panoul Admin se încarcă printr-un singur RPC.
+            Browserul grupează acțiunile timp de 8 secunde. Fiecare vizitator primește un ID aleator local, iar profilul include doar acțiunile și locația aproximativă asociate acelui ID.
         </p>
       </article>
 
@@ -350,9 +403,7 @@ export function AdminAnalyticsPanel({ environment }: { environment: string }) {
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <h3 className="font-semibold">Jurnal de activitate</h3>
-            <p className="mt-1 text-xs text-slate-500">
-              Acțiuni grupate pe zi și tip, fără informații despre vizitatori sau sesiuni.
-            </p>
+            <p className="mt-1 text-xs text-slate-500">Evenimente individuale cu locație aproximativă bazată pe IP.</p>
           </div>
           <span className="text-xs text-slate-500">{number(activityLog.length)} activități recente</span>
         </div>
@@ -368,6 +419,7 @@ export function AdminAnalyticsPanel({ environment }: { environment: string }) {
                     <th className="px-3 py-2 font-medium">Moment</th>
                     <th className="px-3 py-2 font-medium">ID vizitator</th>
                     <th className="px-3 py-2 font-medium">Activitate</th>
+                    <th className="px-3 py-2 font-medium">Locație</th>
                     <th className="px-3 py-2 font-medium">Detalii</th>
                   </tr>
                 </thead>
@@ -375,8 +427,11 @@ export function AdminAnalyticsPanel({ environment }: { environment: string }) {
                   {activityLog.slice(0, activityLimit).map((entry) => (
                     <tr key={`${entry.occurred_at}-${entry.visitor_id}-${entry.name}`} className="border-b border-white/[0.06] last:border-0">
                       <td className="whitespace-nowrap px-3 py-3 text-slate-400">{activityTimeLabel(entry.occurred_at)}</td>
-                      <td className="px-3 py-3 font-mono text-xs text-slate-400">{entry.visitor_id}</td>
+                      <td className="px-3 py-3 font-mono text-xs text-slate-400">
+                        <button type="button" onClick={() => setSelectedVisitorId(entry.visitor_id)} className="hover:text-lime-200 hover:underline">{entry.visitor_id}</button>
+                      </td>
                       <td className="px-3 py-3 text-slate-200">{labelFor(entry.name, eventLabels)}</td>
+                      <td className="max-w-[180px] truncate px-3 py-3 text-slate-400" title={locationLabel(entry)}>{locationLabel(entry)}</td>
                       <td className="max-w-[320px] truncate px-3 py-3 text-slate-400" title={`${entry.page_path} · ${activityDetailsLabel(entry.details)}`}>{entry.page_path} · {activityDetailsLabel(entry.details)}</td>
                     </tr>
                   ))}
@@ -394,6 +449,15 @@ export function AdminAnalyticsPanel({ environment }: { environment: string }) {
             )}
           </>
         )}
+      </article>
+
+      <article className="rounded-lg border border-white/10 bg-white/[0.04] p-5">
+        <h3 className="font-semibold">Profiluri de vizitator</h3>
+        <p className="mt-1 text-xs text-slate-500">ID pseudonim, activitate și locații aproximative. Selectează un profil pentru cronologie.</p>
+        {profiles.length === 0 ? <p className="mt-4 text-sm text-slate-500">Nu există încă profiluri în perioada selectată.</p> : (
+          <div className="mt-4 overflow-x-auto"><table className="w-full min-w-[680px] text-left text-sm"><thead className="border-b border-white/10 text-xs uppercase tracking-[0.12em] text-slate-500"><tr><th className="px-3 py-2">Vizitator</th><th className="px-3 py-2">Ultima activitate</th><th className="px-3 py-2">Evenimente</th><th className="px-3 py-2">Locații</th><th className="px-3 py-2">Platforme / surse</th></tr></thead><tbody>{profiles.map((profile) => <tr key={profile.visitor_id} className="border-b border-white/[0.06] last:border-0"><td className="px-3 py-3 font-mono text-xs"><button type="button" onClick={() => setSelectedVisitorId(profile.visitor_id)} className="text-slate-300 hover:text-lime-200 hover:underline">{profile.visitor_id}</button></td><td className="px-3 py-3 text-slate-400">{activityTimeLabel(profile.last_seen)}</td><td className="px-3 py-3 text-slate-200">{number(profile.events)} ({number(profile.page_views)} pagini)</td><td className="px-3 py-3 text-slate-400">{profile.cities.length ? profile.cities.join(', ') : profile.countries.map(countryLabel).join(', ') || 'Necunoscută'}</td><td className="px-3 py-3 text-slate-400">{profile.platforms.join(', ') || '—'} / {profile.sources.join(', ') || '—'}</td></tr>)}</tbody></table></div>
+        )}
+        {selectedVisitorId && <div className="mt-5 rounded-lg border border-lime-300/20 bg-lime-300/[0.04] p-4"><div className="flex items-center justify-between gap-3"><h4 className="font-medium">Cronologie: <span className="font-mono text-xs text-lime-100">{selectedVisitorId}</span></h4><button type="button" onClick={() => setSelectedVisitorId(null)} className="text-xs text-slate-400 hover:text-white">Închide</button></div>{visitorActivity.length === 0 ? <p className="mt-3 text-sm text-slate-500">Nu există evenimente în perioada selectată.</p> : <ol className="mt-3 space-y-2">{visitorActivity.map((entry) => <li key={`${entry.occurred_at}-${entry.name}`} className="text-sm text-slate-300"><span className="text-slate-500">{activityTimeLabel(entry.occurred_at)}</span> · {labelFor(entry.name, eventLabels)} · <span className="text-slate-400">{locationLabel(entry)}</span>{Object.keys(entry.details).length > 0 && <span className="text-slate-500"> · {activityDetailsLabel(entry.details)}</span>}</li>)}</ol>}</div>}
       </article>
     </section>
   );
