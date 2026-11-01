@@ -674,7 +674,7 @@ function DashboardApp() {
                   </aside>
                   <section className="min-w-0 space-y-5">
                     {tab === 'map' ? (
-                      <LakeMap key={visibleLakes.map((lake) => lake.id).join('|')} lakes={visibleLakes} variant="desktop" />
+                      <LakeMap key={filtered.map((lake) => lake.id).join('|')} lakes={filtered} variant="desktop" />
                     ) : lakeResults}
                   </section>
                 </div>
@@ -684,7 +684,7 @@ function DashboardApp() {
                   {filterPanel}
                   {tabs}
                   {tab === 'map' ? (
-                    <LakeMap key={visibleLakes.map((lake) => lake.id).join('|')} lakes={visibleLakes} />
+                    <LakeMap key={filtered.map((lake) => lake.id).join('|')} lakes={filtered} />
                   ) : lakeResults}
                 </>
               )}
