@@ -14,46 +14,56 @@ export function MapPicker({ lat, lon, onChange }: Props) {
   const containerRef  = useRef<HTMLDivElement>(null);
   const mapRef        = useRef<import('leaflet').Map | null>(null);
   const markerRef     = useRef<import('leaflet').Marker | null>(null);
+  const coordinatesRef = useRef({ lat, lon });
+  const onChangeRef = useRef(onChange);
+  coordinatesRef.current = { lat, lon };
+  onChangeRef.current = onChange;
 
   useEffect(() => {
-    if (!containerRef.current || mapRef.current) return;
+    const container = containerRef.current;
+    if (!container) return;
 
-    import('leaflet').then((leaflet) => {
+    let cancelled = false;
+    let map: import('leaflet').Map | null = null;
+
+    void import('leaflet').then((leaflet) => {
+      if (cancelled || !container.isConnected) return;
+
       const L = leaflet.default;
+      const coordinates = coordinatesRef.current;
+      const initialLat = coordinates.lat;
+      const initialLon = coordinates.lon;
+      const hasCoordinates = initialLat !== null && initialLon !== null;
+      const center: [number, number] = hasCoordinates ? [initialLat, initialLon] : DEFAULT_CENTER;
 
-      const map = L.map(containerRef.current!, {
-        center: lat && lon ? [lat, lon] : DEFAULT_CENTER,
-        zoom: lat && lon ? 11 : DEFAULT_ZOOM,
+      const leafletMap = L.map(container, {
+        center,
+        zoom: hasCoordinates ? 11 : DEFAULT_ZOOM,
         zoomControl: false,
       });
+      map = leafletMap;
 
-      mapRef.current = map;
+      mapRef.current = leafletMap;
 
-      L.control.zoom({ position: 'bottomright' }).addTo(map);
+      L.control.zoom({ position: 'bottomright' }).addTo(leafletMap);
 
-      L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
-        attribution: 'Tiles © Esri',
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors',
         maxZoom: 19,
-        maxNativeZoom: 16,
-      }).addTo(map);
-      L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}', {
-        attribution: 'Tiles © Esri',
-        maxZoom: 19,
-        maxNativeZoom: 16,
-      }).addTo(map);
+      }).addTo(leafletMap);
 
       // If coords already set, place marker
-      if (lat && lon) {
-        markerRef.current = L.marker([lat, lon], { draggable: true })
-          .addTo(map)
+      if (hasCoordinates) {
+        markerRef.current = L.marker([initialLat, initialLon], { draggable: true })
+          .addTo(leafletMap)
           .on('dragend', (e) => {
             const pos = (e.target as import('leaflet').Marker).getLatLng();
-            onChange(+pos.lat.toFixed(6), +pos.lng.toFixed(6));
+            onChangeRef.current(+pos.lat.toFixed(6), +pos.lng.toFixed(6));
           });
       }
 
       // Click to set/move marker
-      map.on('click', (e) => {
+      leafletMap.on('click', (e) => {
         const { lat: clickLat, lng: clickLon } = e.latlng;
         const rounded = { lat: +clickLat.toFixed(6), lon: +clickLon.toFixed(6) };
 
@@ -61,41 +71,57 @@ export function MapPicker({ lat, lon, onChange }: Props) {
           markerRef.current.setLatLng([rounded.lat, rounded.lon]);
         } else {
           markerRef.current = L.marker([rounded.lat, rounded.lon], { draggable: true })
-            .addTo(map)
+            .addTo(leafletMap)
             .on('dragend', (ev) => {
               const pos = (ev.target as import('leaflet').Marker).getLatLng();
-              onChange(+pos.lat.toFixed(6), +pos.lng.toFixed(6));
+              onChangeRef.current(+pos.lat.toFixed(6), +pos.lng.toFixed(6));
             });
         }
 
-        onChange(rounded.lat, rounded.lon);
+        onChangeRef.current(rounded.lat, rounded.lon);
       });
+
+      requestAnimationFrame(() => {
+        if (!cancelled) leafletMap.invalidateSize();
+      });
+    }).catch((error: unknown) => {
+      console.error('Could not initialize the location picker.', error);
     });
 
     return () => {
-      mapRef.current?.remove();
-      mapRef.current = null;
+      cancelled = true;
+      map?.remove();
+      if (mapRef.current === map) mapRef.current = null;
       markerRef.current = null;
     };
   }, []);
 
   // Sync marker when lat/lon change externally (e.g. "use my location")
   useEffect(() => {
-    if (!mapRef.current || lat === null || lon === null) return;
-    import('leaflet').then((leaflet) => {
+    const map = mapRef.current;
+    if (!map || lat === null || lon === null) return;
+
+    let cancelled = false;
+    void import('leaflet').then((leaflet) => {
+      if (cancelled || mapRef.current !== map) return;
+
       const L = leaflet.default;
       if (markerRef.current) {
         markerRef.current.setLatLng([lat, lon]);
       } else {
         markerRef.current = L.marker([lat, lon], { draggable: true })
-          .addTo(mapRef.current!)
+          .addTo(map)
           .on('dragend', (e) => {
             const pos = (e.target as import('leaflet').Marker).getLatLng();
-            onChange(+pos.lat.toFixed(6), +pos.lng.toFixed(6));
+            onChangeRef.current(+pos.lat.toFixed(6), +pos.lng.toFixed(6));
           });
       }
-      mapRef.current!.flyTo([lat, lon], 12, { duration: 1 });
+      map.flyTo([lat, lon], 12, { duration: 1 });
     });
+
+    return () => {
+      cancelled = true;
+    };
   }, [lat, lon]);
 
   return (
@@ -104,7 +130,7 @@ export function MapPicker({ lat, lon, onChange }: Props) {
         <span className="text-sm font-body font-medium text-slate-300">
           📍 Locație pe hartă
         </span>
-        {lat && lon && (
+        {lat !== null && lon !== null && (
           <span className="text-xs font-mono text-slate-500">
             {lat.toFixed(4)}, {lon.toFixed(4)}
           </span>
@@ -118,7 +144,7 @@ export function MapPicker({ lat, lon, onChange }: Props) {
         <div ref={containerRef} className="w-full h-full" />
 
         {/* Hint overlay */}
-        {!lat && !lon && (
+        {(lat === null || lon === null) && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
             <div className="bg-mud-900/80 backdrop-blur rounded-xl px-4 py-2 text-sm text-slate-400 font-body">
               Apasă pe hartă pentru a seta locația

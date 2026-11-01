@@ -122,12 +122,15 @@ export async function fetchAvailableDays(): Promise<string[]> {
     return SAMPLE_DAYS;
   }
 
-  const forecastDays = buildForecastDays();
+  const today = getLocalDateKey();
 
   // Get distinct calendar days from calculated_at
   const { data, error } = await supabase
     .from(tables.lakeScores)
     .select('calculated_at')
+    // Only read forecast rows that can be shown. Reading the complete history
+    // reaches Supabase's response cap, which hid the newest forecast dates.
+    .gte('calculated_at', `${today}T00:00:00`)
     .order('calculated_at', { ascending: true });
 
   if (error || !data) {
@@ -142,15 +145,11 @@ export async function fetchAvailableDays(): Promise<string[]> {
     seen.add(day);
   }
 
-  const today = getLocalDateKey();
-  // Supabase responses may be capped before all forecast dates are represented.
-  forecastDays.forEach((day) => seen.add(day));
-
   const days = Array.from(seen)
-    .filter((day) => day >= today)
     .sort();
 
-  return days.length > 0 ? days : forecastDays;
+  // Do not add dates without scores: selecting one would display an empty map.
+  return days.length > 0 ? days : SAMPLE_DAYS;
 }
 
 // ── Fetch lake scores for a specific day, joined with lake metadata ──────────
